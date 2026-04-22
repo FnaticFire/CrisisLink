@@ -21,10 +21,25 @@ const userIcon = L.divIcon({
   iconSize: [24, 24],
 });
 
-const responderIcon = L.divIcon({
+const getEmergencyIcon = (severity: string) => {
+  const color = severity === 'critical' ? 'bg-red-500' : severity === 'high' ? 'bg-orange-500' : 'bg-amber-500';
+  return L.divIcon({
+    className: 'emergency-marker',
+    html: `<div class="w-10 h-10 ${color} border-4 border-white rounded-2xl shadow-xl flex items-center justify-center text-white animate-bounce">🚨</div>`,
+    iconSize: [40, 40],
+  });
+};
+
+const responderIcon = (name: string) => L.divIcon({
   className: 'responder-marker',
-  html: '<div class="w-8 h-8 bg-primary border-4 border-white rounded-full shadow-lg flex items-center justify-center text-white text-[10px] font-bold">🦺</div>',
-  iconSize: [32, 32],
+  html: `<div class="flex flex-col items-center">
+          <div class="w-10 h-10 bg-white border-2 border-primary rounded-full shadow-lg flex items-center justify-center overflow-hidden">
+            <img src="https://i.pravatar.cc/100?u=${name}" class="w-full h-full object-cover" />
+          </div>
+          <div class="bg-primary text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold -mt-2 border border-white uppercase">${name.split(' ')[0]}</div>
+         </div>`,
+  iconSize: [50, 60],
+  iconAnchor: [25, 50],
 });
 
 const MapComponent = () => {
@@ -60,15 +75,25 @@ const MapComponent = () => {
         </Marker>
       )}
 
+      {/* Active Alert Marker */}
+      {activeAlert && (
+        <Marker position={[activeAlert.location.lat, activeAlert.location.lng]} icon={getEmergencyIcon(activeAlert.severity)}>
+          <Popup>
+            <div className="font-bold">{activeAlert.type}</div>
+            <div className="text-xs uppercase font-black text-primary">{activeAlert.severity} Priority</div>
+          </Popup>
+        </Marker>
+      )}
+
       {/* Responder Markers */}
       {responders.map(responder => (
         <Marker 
           key={responder.id} 
           position={[
-            responder.id === 'resp-1' ? 28.6160 : responder.id === 'resp-2' ? 28.6110 : 28.6180, 
-            responder.id === 'resp-1' ? 77.2110 : responder.id === 'resp-2' ? 77.2070 : 77.2150
+            responder.id === 'resp-1' ? 28.6160 : responder.id === 'resp-2' ? 28.6110 : responder.id === 'resp-3' ? 28.6180 : 28.6120, 
+            responder.id === 'resp-1' ? 77.2110 : responder.id === 'resp-2' ? 77.2070 : responder.id === 'resp-3' ? 77.2150 : 77.2140
           ]} 
-          icon={responderIcon}
+          icon={responderIcon(responder.name)}
         >
           <Popup>{responder.name}</Popup>
         </Marker>

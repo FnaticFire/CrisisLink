@@ -1,0 +1,50 @@
+CRISISLINK API REQUIREMENTS & SETUP GUIDE
+========================================
+
+To enable full production functionality for CrisisLink, the following Google Cloud and Firebase services are required.
+
+1. FIREBASE SETUP (Mandatory)
+---------------------------
+- Project: crisislink-2b499 (or your own)
+- Authentication: Enable Phone & Email/Password.
+- Firestore: Create a database in 'production' or 'test' mode.
+- Cloud Messaging (FCM): Enable for push notifications.
+- API Key: Found in Project Settings > Web App.
+
+2. GOOGLE MAPS PLATFORM
+-----------------------
+- API Key: Obtain from https://console.cloud.google.com/
+- Enable APIs: 
+  - Maps SDK for JavaScript
+  - Places API
+  - Directions API (for responder routing)
+
+3. CLOUD VISION AI
+------------------
+- Enable: Cloud Vision API
+- Key: Google Cloud API Key
+- Use Case: Detects fire, accidents, blood, and weapons from user-uploaded images.
+
+4. CLOUD SPEECH-TO-TEXT
+-----------------------
+- Enable: Cloud Speech-to-Text API
+- Use Case: Converts user voice distress calls into text for Gemini analysis.
+
+5. VERTEX AI / GENIMINI (Gemini 1.5 Flash recommended)
+------------------------------------------------------
+- Enable: Vertex AI API
+- Key: Google Cloud API Key or Service Account.
+- Use Case: 
+  - Classifying the emergency type from text/labels.
+  - Calculating severity scores (LOW/MEDIUM/HIGH/CRITICAL).
+  - Generating real-time safety instructions for the user.
+
+6. ENVIRONMENT VARIABLES (.env.local)
+--------------------------------------
+Create a .env.local file in the root with:
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...
+GOOGLE_CLOUD_API_KEY=... (For Vision/Gemini/Speech)
+
+NOTE: Current implementation uses a hybrid MOCK + REAL system. 
+Remove mock logic from /src/lib/ai/ files for full production scaling.
