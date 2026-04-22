@@ -1,26 +1,75 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #E53935;
+  --color-secondary: #4A90E2;
+  --color-accent: #F5F5F5;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #FFFFFF;
+  --foreground: #1A1A1A;
+  --surface: #F8F9FA;
 }
 
 body {
-  background: var(--background);
+  background-color: #f0f2f5;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Mobile container - centered inside browser */
+.app-container {
+  max-width: 420px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--background);
+  position: relative;
+  box-shadow: 0 0 40px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+.bottom-nav-height {
+  padding-bottom: 80px;
+}
+
+/* Soft shadows */
+.soft-shadow {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+/* Rounded corners */
+.rounded-btn {
+  border-radius: 12px;
+}
+
+.rounded-card {
+  border-radius: 20px;
+}
+
+/* Interactions */
+.tap-effect:active {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
