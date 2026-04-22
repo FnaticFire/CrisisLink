@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import { Toaster } from "react-hot-toast";
+import FirebaseInit from "@/components/FirebaseInit";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <body className={`${inter.className} min-h-full`} suppressHydrationWarning>
+        <FirebaseInit />
         <div className="app-container overflow-hidden">
           {children}
           <BottomNav />
