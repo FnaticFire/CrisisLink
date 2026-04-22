@@ -17,8 +17,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className={`${inter.className} min-h-full`}>
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+      <body className={`${inter.className} min-h-full`} suppressHydrationWarning>
         <div className="app-container overflow-hidden">
           {children}
           <BottomNav />

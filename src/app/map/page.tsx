@@ -11,10 +11,27 @@ const MapComponent = dynamic(() => import('@/components/MapComponent'), {
 });
 
 const MapPage = () => {
-  const { activeAlert, setActiveAlert } = useAppStore();
+  const { activeAlert, setActiveAlert, updateUserLocation } = useAppStore();
+
+  React.useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          updateUserLocation(
+            position.coords.latitude,
+            position.coords.longitude,
+            "Your Current Location"
+          );
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+        }
+      );
+    }
+  }, [updateUserLocation]);
 
   return (
-    <div className="flex flex-col flex-1 h-screen relative box-border">
+    <div className="flex flex-col grow relative w-full h-[calc(100vh-80px)]">
       {/* Search Overlay */}
       {!activeAlert && (
         <div className="absolute top-12 left-6 right-6 z-10">

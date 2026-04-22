@@ -14,6 +14,7 @@ interface AppState {
   setActiveAlert: (alert: Alert | null) => void;
   addMessage: (message: Message) => void;
   updateResponderStatus: (id: string, status: Responder['status']) => void;
+  updateUserLocation: (lat: number, lng: number, address: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -68,10 +69,16 @@ export const useAppStore = create<AppState>((set) => ({
   messages: [],
 
   setRole: (role) => set({ currentRole: role }),
-  setCurrentUser: (user) => set({ currentUser: user }),
   setActiveAlert: (alert) => set({ activeAlert: alert }),
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
   updateResponderStatus: (id, status) => set((state) => ({
     responders: state.responders.map(r => r.id === id ? { ...r, status } : r)
+  })),
+  setCurrentUser: (user) => set({ currentUser: user }),
+  updateUserLocation: (lat, lng, address) => set((state) => ({
+    currentUser: state.currentUser ? {
+      ...state.currentUser,
+      location: { lat, lng, address }
+    } : null
   }))
 }));

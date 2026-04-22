@@ -8,7 +8,24 @@ import TopBar from '@/components/TopBar';
 import ResponderCard from '@/components/ResponderCard';
 
 export default function Home() {
-  const { responders } = useAppStore();
+  const { responders, updateUserLocation } = useAppStore();
+
+  React.useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          updateUserLocation(
+            position.coords.latitude,
+            position.coords.longitude,
+            "Your Current Location"
+          );
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+        }
+      );
+    }
+  }, [updateUserLocation]);
 
   const quickActions = [
     { label: 'Emergency', icon: ShieldAlert, color: 'bg-red-50 text-red-500' },
