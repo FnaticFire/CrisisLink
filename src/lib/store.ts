@@ -20,9 +20,9 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   currentUser: {
     id: 'user-1',
-    name: 'Sarah Mitchell',
+    name: 'Pranab Mudliar',
     role: 'user',
-    avatar: 'https://i.pravatar.cc/150?u=sarah',
+    avatar: 'https://i.pravatar.cc/150?u=pranab',
     location: {
       lat: 28.6139,
       lng: 77.2090,
