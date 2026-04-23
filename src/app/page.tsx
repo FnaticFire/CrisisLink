@@ -50,16 +50,18 @@ export default function HomePage() {
             }
           });
 
+          setLoading(false);
           return () => unsubAlerts();
         } else {
           setCurrentUser(null);
+          setLoading(false);
           router.push('/login');
         }
       } else {
         setCurrentUser(null);
+        setLoading(false);
         router.push('/login');
       }
-      setLoading(false);
     });
 
     return () => unsubAuth();
