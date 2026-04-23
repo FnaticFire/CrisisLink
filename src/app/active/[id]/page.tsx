@@ -34,7 +34,7 @@ export default function ActiveEmergencyPage({ params }: { params: Promise<{ id: 
     const unsubAlert = onSnapshot(doc(db, 'alerts', unwrappedParams.id), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data() as AlertDoc;
-        setAlert(data);
+        setAlert({ id: docSnap.id, ...data });
         if (data.status === 'resolved') {
           toast.success('Emergency resolved.');
           router.push('/');
