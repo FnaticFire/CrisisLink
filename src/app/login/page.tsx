@@ -40,7 +40,18 @@ export default function LoginPage() {
           setCurrentUser(userDoc.data() as UserDoc);
           router.push('/');
         } else {
-          toast.error('User profile not found in database.');
+          // Self-heal: Create missing profile
+          const recoveredUser: UserDoc = {
+            id: cred.user.uid,
+            email: cred.user.email || email,
+            username: cred.user.displayName || email.split('@')[0],
+            role: 'civilian',
+            isVolunteer: false,
+            isAvailable: true,
+          };
+          await setDoc(doc(db, 'users', cred.user.uid), recoveredUser);
+          setCurrentUser(recoveredUser);
+          router.push('/');
         }
       } else {
         // Sign Up Flow
