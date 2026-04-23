@@ -24,9 +24,9 @@ export interface Alert {
   id: string;
   userId: string;
   responderId?: string;
-  type: 'emergency' | 'medical' | 'fire' | 'violence';
+  type: string;
   status: 'pending' | 'dispatched' | 'active' | 'resolved';
-  severity: 'low' | 'medium' | 'high';
+  severity: string;
   location: {
     lat: number;
     lng: number;
