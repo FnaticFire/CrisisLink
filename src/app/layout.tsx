@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import BottomNav from "@/components/BottomNav";
+
 import { Toaster } from "react-hot-toast";
 import FirebaseInit from "@/components/FirebaseInit";
 
@@ -23,7 +23,6 @@ export default function RootLayout({
         <FirebaseInit />
         <div className="app-container overflow-hidden">
           {children}
-          <BottomNav />
         </div>
         <Toaster position="top-center" />
       </body>
