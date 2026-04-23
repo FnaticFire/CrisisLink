@@ -31,42 +31,52 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
     return () => clearInterval(interval);
   }, [step]);
 
-  // ── Voice Recording via MediaRecorder + Web Speech API ──
-  const handleStartRecording = async () => {
+  const recognitionRef = useRef<any>(null);
+
+  // ── Voice Recording via Web Speech API ──
+  const handleStartRecording = () => {
     setStep('recording');
     setRecordTime(0);
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks: BlobPart[] = [];
-
-      recorder.ondataavailable = (e) => chunks.push(e.data);
-      recorder.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        await handleProcess(blob);
-      };
-
-      mediaRecorderRef.current = recorder;
-      recorder.start();
-
-      // Auto-stop after 8 seconds
-      setTimeout(() => {
-        if (recorder.state === 'recording') recorder.stop();
-      }, 8000);
-    } catch (err) {
-      console.error('Microphone access denied:', err);
-      toast.error('Microphone access denied. Using manual mode.');
-      // Fallback: process without real audio
-      await handleProcess(new Blob());
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error('Voice not supported. Using AI fallback inference.');
+      handleProcess('I have a critical emergency, please dispatch help.');
+      return;
     }
+
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    recognition.lang = 'en-IN';
+    recognition.interimResults = false;
+    let finalTranscript = '';
+
+    recognition.onresult = (e: any) => {
+      finalTranscript = e.results[0][0].transcript;
+    };
+
+    recognition.onend = () => {
+      handleProcess(finalTranscript || 'Emergency triggered. Need assistance.');
+    };
+
+    try {
+      recognition.start();
+    } catch {
+      handleProcess('Emergency triggered via fallback.');
+    }
+
+    // Auto-stop after 8 seconds
+    setTimeout(() => {
+      try {
+        if (recognitionRef.current) recognitionRef.current.stop();
+      } catch {}
+    }, 8000);
   };
 
   const handleStopRecording = () => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
+    try {
+      if (recognitionRef.current) recognitionRef.current.stop();
+    } catch {}
   };
 
   // ── Image Upload ──
@@ -96,15 +106,12 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
   };
 
   // ── Main AI Processing Pipeline ──
-  const handleProcess = async (audioBlob: Blob) => {
+  const handleProcess = async (transcript: string) => {
     setStep('processing');
 
     try {
-      setProcessingStep('Transcribing voice with Speech API...');
-      const transcript = await transcribeAudio(audioBlob);
-
       setProcessingStep('Classifying emergency with Grok AI...');
-      const result = await classifyEmergency(transcript, ['Distress', 'Voice-call']);
+      const result = await classifyEmergency(transcript, ['Distress', 'Voice Command']);
 
       setAiResult(result);
       setStep('confirming');

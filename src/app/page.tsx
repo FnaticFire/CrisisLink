@@ -25,6 +25,8 @@ export default function HomePage() {
   const [showTrigger, setShowTrigger] = useState(false);
 
   useEffect(() => {
+    let unsubAlerts: (() => void) | undefined;
+
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
         const docRef = await getDoc(doc(db, 'users', user.uid));
@@ -37,7 +39,9 @@ export default function HomePage() {
             where('status', 'in', ['pending', 'accepted'])
           );
 
-          const unsubAlerts = onSnapshot(q, (snapshot) => {
+          if (unsubAlerts) unsubAlerts();
+          
+          unsubAlerts = onSnapshot(q, (snapshot) => {
             const alerts: AlertDoc[] = [];
             snapshot.forEach(d => alerts.push({ id: d.id, ...d.data() } as AlertDoc));
             setNearbyAlerts(alerts);
@@ -51,7 +55,6 @@ export default function HomePage() {
           });
 
           setLoading(false);
-          return () => unsubAlerts();
         } else {
           setCurrentUser(null);
           setLoading(false);
@@ -64,7 +67,10 @@ export default function HomePage() {
       }
     });
 
-    return () => unsubAuth();
+    return () => {
+      unsubAuth();
+      if (unsubAlerts) unsubAlerts();
+    };
   }, [router, setCurrentUser, setActiveAlertId]);
 
   useEffect(() => {
