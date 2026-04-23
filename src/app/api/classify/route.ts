@@ -35,10 +35,10 @@ Be decisive. Prioritize life safety. Return ONLY JSON.`;
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'grok-3-mini',
+        model: 'grok-2',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 400,
+        temperature: 0.1,
+        max_tokens: 500,
       }),
     });
 

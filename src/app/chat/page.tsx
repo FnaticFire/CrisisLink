@@ -64,18 +64,21 @@ const ChatPage = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-    // Mark messages read when viewed
+  }, [messages, isTyping]);
+
+  // Separate effect for marking messages as read
+  useEffect(() => {
     if (activeAlert) {
       markMessagesRead(activeAlert.id);
     }
-  }, [messages, isTyping, activeAlert, markMessagesRead]);
+  }, [activeAlert, messages.length, markMessagesRead]);
 
   // Auto-greet on first load if no messages
   useEffect(() => {
     if (messages.length === 0) {
       setTimeout(() => {
         addMessage({
-          id: 'auto-0',
+          id: 'welcome-' + Date.now(),
           alertId: activeAlert?.id || 'default',
           senderId: responder.id,
           text: `I am ${responder.name}. I've received your ${activeAlert?.type || 'emergency'} alert. I'm currently en-route to your location. ETA: ~4 minutes. Stay calm.`,

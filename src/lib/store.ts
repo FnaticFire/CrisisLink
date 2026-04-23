@@ -126,13 +126,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       notifications: state.notifications.map((n) => ({ ...n, read: true })),
     })),
   markMessagesRead: (alertId) =>
-    set((state) => ({
-      messages: state.messages.map((m) =>
-        m.alertId === alertId && m.senderId !== state.currentUser?.id
-          ? { ...m, status: 'read' }
-          : m
-      ),
-    })),
+    set((state) => {
+      const needsUpdate = state.messages.some(
+        (m) => m.alertId === alertId && m.senderId !== state.currentUser?.id && m.status !== 'read'
+      );
+      if (!needsUpdate) return {};
+      return {
+        messages: state.messages.map((m) =>
+          m.alertId === alertId && m.senderId !== state.currentUser?.id
+            ? { ...m, status: 'read' }
+            : m
+        ),
+      };
+    }),
   resolveAlert: () =>
     set((state) => {
       const alert = state.activeAlert;
