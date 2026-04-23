@@ -5,9 +5,6 @@ import { Mic, Camera, X, ShieldAlert, Check, AlertCircle, Loader2, Radio } from 
 import { transcribeAudio, analyzeEmergencyImage, classifyEmergency, AIDetectionResult } from '@/lib/ai/detection';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'react-hot-toast';
-import { db } from '@/lib/firebase';
-import { collection, addDoc } from 'firebase/firestore';
-import { AlertDoc } from '@/lib/types';
 
 interface EmergencyTriggerProps {
   onClose: () => void;
@@ -21,7 +18,7 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { setActiveAlertId, currentUser, currentLocation } = useAppStore();
+  const { setActiveAlert, currentUser } = useAppStore();
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -122,33 +119,22 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
   };
 
   // ── Confirm & Create Alert ──
-  const handleConfirm = async () => {
-    if (!aiResult || !currentUser || !currentLocation) {
-      toast.error('Missing user or location. Please ensure location is enabled.');
-      return;
-    }
+  const handleConfirm = () => {
+    if (!aiResult) return;
 
-    try {
-      const newAlert: AlertDoc = {
-        userId: currentUser.id,
-        userLocation: currentLocation,
-        type: aiResult.emergencyType,
-        severity: aiResult.severity,
-        status: 'pending',
-        responders: [],
-        confidence: aiResult.confidence,
-        reason: aiResult.reason,
-        instructions: aiResult.instructions,
-        createdAt: Date.now(),
-      };
+    const newAlert = {
+      id: 'alert-' + Date.now(),
+      userId: currentUser?.id || 'guest',
+      type: aiResult.emergencyType,
+      status: 'pending' as any,
+      severity: aiResult.severity.toLowerCase() as any,
+      location: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
+      createdAt: new Date().toISOString(),
+    };
 
-      const docRef = await addDoc(collection(db, 'alerts'), newAlert);
-      toast.success(`🚨 ${aiResult.emergencyType} reported. Responders notified!`);
-      // setActiveAlertId operates locally but the Firebase listener on HomePage will also trigger redirect
-      onClose();
-    } catch (err) {
-      toast.error('Failed to create emergency alert.');
-    }
+    setActiveAlert(newAlert);
+    toast.success(`🚨 ${aiResult.emergencyType} reported. Help is on the way!`);
+    onClose();
   };
 
   const formatTime = (s: number) => {

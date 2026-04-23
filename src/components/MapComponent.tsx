@@ -6,7 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAppStore } from '@/lib/store';
 import { NearbyPlace } from '@/lib/places';
-import { AlertDoc } from '@/lib/types';
+import { Alert } from '@/lib/types';
 
 // Icons
 const icon = L.icon({
@@ -44,13 +44,13 @@ const recommendationIcon = (type: string) => {
 
 interface MapComponentProps {
   nearbyPlaces?: NearbyPlace[];
-  alerts?: AlertDoc[];
+  alerts?: Alert[];
   trackingResponderId?: string;
   trackingPos?: [number, number];
 }
 
 const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts = [], trackingResponderId, trackingPos }) => {
-  const { currentUser, currentLocation } = useAppStore();
+  const { currentUser } = useAppStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -59,8 +59,8 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
 
   if (!mounted) return null;
 
-  const center: [number, number] = currentLocation 
-    ? [currentLocation.lat, currentLocation.lng] 
+  const center: [number, number] = currentUser?.location 
+    ? [currentUser.location.lat, currentUser.location.lng] 
     : [28.6139, 77.2090]; // Default New Delhi
 
   return (
@@ -76,8 +76,8 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
       />
       
       {/* User Current Location */}
-      {currentLocation && (
-        <Marker position={[currentLocation.lat, currentLocation.lng]} icon={userIcon}>
+      {currentUser?.location && (
+        <Marker position={[currentUser.location.lat, currentUser.location.lng]} icon={userIcon}>
           <Popup>Your Location</Popup>
         </Marker>
       )}
@@ -86,7 +86,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
       {alerts.map(alert => (
         <Marker 
           key={alert.id} 
-          position={[alert.userLocation.lat, alert.userLocation.lng]} 
+          position={[alert.location.lat, alert.location.lng]} 
           icon={getEmergencyIcon(alert.severity)}
         >
           <Popup>
