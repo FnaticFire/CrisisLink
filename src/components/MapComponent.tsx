@@ -9,21 +9,22 @@ import { NearbyPlace } from '@/lib/places';
 import { AlertDoc } from '@/lib/types';
 
 // Icons
-const icon = L.icon({
+const icon = typeof window !== 'undefined' ? L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
   iconSize: [25, 41],
   iconAnchor: [12, 41],
-});
+}) : undefined;
 
-const userIcon = L.divIcon({
+const userIcon = typeof window !== 'undefined' ? L.divIcon({
   className: 'user-marker',
   html: '<div class="w-6 h-6 bg-blue-500 border-4 border-white rounded-full shadow-lg pulse-blue"></div>',
   iconSize: [24, 24],
-});
+}) : undefined;
 
 const getEmergencyIcon = (severity: string) => {
+  if (typeof window === 'undefined') return undefined;
   const color = severity === 'CRITICAL' ? 'bg-red-600' : severity === 'HIGH' ? 'bg-red-400' : severity === 'MEDIUM' ? 'bg-yellow-400' : 'bg-blue-400';
   return L.divIcon({
     className: 'emergency-marker',
@@ -33,6 +34,7 @@ const getEmergencyIcon = (severity: string) => {
 };
 
 const recommendationIcon = (type: string) => {
+  if (typeof window === 'undefined') return undefined;
   const emoji = type === 'hospital' ? '🏥' : type === 'police' ? '👮' : '🚒';
   const color = type === 'hospital' ? 'bg-red-500' : type === 'police' ? 'bg-blue-600' : 'bg-orange-600';
   return L.divIcon({

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { ShieldAlert, Users, Landmark, BookOpen, ChevronRight, X } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import ResponderCard from '@/components/ResponderCard';
 import EmergencyTrigger from '@/components/EmergencyTrigger';
@@ -27,12 +28,20 @@ const EMERGENCY_NUMBERS = [
 ];
 
 export default function Home() {
-  const { responders, updateUserLocation, activeAlert } = useAppStore();
+  const { responders, currentUser, updateUserLocation, activeAlert } = useAppStore();
+  const router = useRouter();
+  
   const [showTrigger, setShowTrigger] = useState(false);
   const [showSafetyTips, setShowSafetyTips] = useState(false);
   const [showHospitals, setShowHospitals] = useState(false);
   const [selectedTip, setSelectedTip] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+
+  React.useEffect(() => {
+    if (!currentUser) {
+      router.replace('/login');
+    }
+  }, [currentUser, router]);
 
   React.useEffect(() => {
     if ('geolocation' in navigator) {

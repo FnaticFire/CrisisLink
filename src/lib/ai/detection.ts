@@ -138,6 +138,8 @@ export async function classifyEmergency(
   }
 
   const prompt = `You are CrisisLink's emergency triage AI. Analyze this distress call and image scene.
+  
+CRITICAL RULE: "Heart attack", "brain attack", "head injury", or terms related to sudden bodily trauma are "Medical Emergency", NOT "Violence". Only label "Violence" if there is explicit mention of weapons, assault, or fighting.
 
 VOICE TRANSCRIPT: "${transcript}"
 IMAGE SCENE LABELS: ${labels.join(', ')}

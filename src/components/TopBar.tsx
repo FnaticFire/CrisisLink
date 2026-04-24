@@ -2,9 +2,10 @@
 
 import React, { useState } from 'react';
 import { Bell, Search, X, Check } from 'lucide-react';
-import { MapPin } from 'lucide-react';
+import { MapPin, RefreshCw, LogOut } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { formatDistanceToNow } from 'date-fns';
+import { useRouter } from 'next/navigation';
 
 interface TopBarProps {
   showSearch?: boolean;
@@ -13,14 +14,54 @@ interface TopBarProps {
 }
 
 const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuery = '' }) => {
-  const { currentUser, notifications, markNotificationsRead } = useAppStore();
+  const { currentUser, notifications, markNotificationsRead, updateUserLocation, setCurrentUser } = useAppStore();
   const [showNotifs, setShowNotifs] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const router = useRouter();
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleBellClick = () => {
     setShowNotifs((prev) => !prev);
     if (!showNotifs) markNotificationsRead();
+  };
+
+  const handleRefreshLocation = () => {
+    if (!('geolocation' in navigator)) return;
+    setIsRefreshing(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+            headers: { 'Accept-Language': 'en' }
+          });
+          const data = await res.json();
+          let placeName = 'Locating...';
+          
+          if (data && data.address) {
+            placeName = data.address.neighbourhood || data.address.suburb || data.address.city_district || data.address.city || data.address.town || 'New Delhi';
+            if (data.address.city) placeName += ', ' + data.address.city;
+          }
+          
+          updateUserLocation(lat, lng, placeName);
+        } catch (err) {
+          updateUserLocation(pos.coords.latitude, pos.coords.longitude, 'Location Updated');
+        } finally {
+          setIsRefreshing(false);
+        }
+      },
+      () => {
+        setIsRefreshing(false);
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
+  const handleSignOut = () => {
+    setCurrentUser(null);
+    router.push('/login');
   };
 
   return (
@@ -30,20 +71,32 @@ const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuer
           <span className="text-xs text-gray-400 font-medium tracking-wide flex items-center gap-1">
             <MapPin size={12} className="text-primary" />
             YOUR LOCATION
+            <button onClick={handleRefreshLocation} disabled={isRefreshing} className="ml-1 p-1 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50">
+              <RefreshCw size={12} className={`text-gray-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
           </span>
-          <h2 className="text-sm font-semibold text-gray-800 truncate max-w-[200px]">
+          <h2 className="text-sm font-semibold text-gray-800 truncate max-w-[180px]">
             {currentUser?.location?.address || 'Connaught Place, New Delhi'}
           </h2>
         </div>
-        <button
-          onClick={handleBellClick}
-          className="p-2.5 bg-gray-50 rounded-full text-gray-600 soft-shadow tap-effect relative"
-        >
-          <Bell size={20} />
-          {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-white" />
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSignOut}
+            className="p-2.5 bg-red-50 rounded-full text-red-500 soft-shadow tap-effect flex items-center gap-1"
+            title="Sign Out"
+          >
+            <LogOut size={16} />
+          </button>
+          <button
+            onClick={handleBellClick}
+            className="p-2.5 bg-gray-50 rounded-full text-gray-600 soft-shadow tap-effect relative"
+          >
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-white" />
+            )}
+          </button>
+        </div>
       </div>
 
       {showSearch && (
