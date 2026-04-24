@@ -39,7 +39,7 @@ const ProfilePage = () => {
   const [showNotifModal, setShowNotifModal] = useState(false);
 
   // Edit form state
-  const [editName, setEditName] = useState(currentUser?.name || '');
+  const [editName, setEditName] = useState(currentUser?.username || '');
   const [editPhone, setEditPhone] = useState('+91 98765 43210');
   const [newLocName, setNewLocName] = useState('');
   const [newLocAddr, setNewLocAddr] = useState('');
@@ -61,7 +61,7 @@ const ProfilePage = () => {
   });
 
   const handleSaveProfile = () => {
-    updateCurrentUser({ name: editName });
+    updateCurrentUser({ username: editName });
     toast.success('Profile updated!');
     setShowEditModal(false);
   };
@@ -119,14 +119,14 @@ const ProfilePage = () => {
             <Image src={currentUser?.avatar || ''} alt="Profile" fill className="object-cover" />
           </div>
           <button
-            onClick={() => { setEditName(currentUser?.name || ''); setShowEditModal(true); }}
+            onClick={() => { setEditName(currentUser?.username || ''); setShowEditModal(true); }}
             className="absolute -bottom-1 -right-1 bg-primary text-white p-2 rounded-xl shadow-lg border-2 border-white tap-effect"
           >
             <Edit3 size={14} />
           </button>
         </div>
 
-        <h2 className="text-xl font-black text-gray-900">{currentUser?.name}</h2>
+        <h2 className="text-xl font-black text-gray-900">{currentUser?.username}</h2>
         <p className="text-xs font-bold text-primary uppercase tracking-[0.2em] mt-1">Premium User</p>
         <p className="text-xs text-gray-400 mt-1">📍 {currentUser?.location?.address || 'New Delhi, India'}</p>
       </div>

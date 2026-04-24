@@ -34,8 +34,8 @@ const ResponderCard: React.FC<ResponderCardProps> = ({ responder }) => {
     toast.promise(
       new Promise<void>((resolve) => setTimeout(resolve, 1200)),
       {
-        loading: `Alerting ${responder.name}...`,
-        success: `🚨 ${responder.name} has been notified!`,
+        loading: `Alerting ${responder.username}...`,
+        success: `🚨 ${responder.username} has been notified!`,
         error: 'Failed to send alert.',
       }
     ).then(() => {
@@ -70,8 +70,8 @@ const ResponderCard: React.FC<ResponderCardProps> = ({ responder }) => {
     >
       <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0">
         <Image
-          src={responder.avatar}
-          alt={responder.name}
+          src={responder.avatar || 'https://i.pravatar.cc/150'}
+          alt={responder.username}
           fill
           className="object-cover"
         />
@@ -80,7 +80,7 @@ const ResponderCard: React.FC<ResponderCardProps> = ({ responder }) => {
 
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-start">
-          <h3 className="font-bold text-gray-900 truncate">{responder.name}</h3>
+          <h3 className="font-bold text-gray-900 truncate">{responder.username}</h3>
           <span className="flex items-center gap-0.5 text-xs font-bold text-orange-500 shrink-0">
             <Star size={12} fill="currentColor" />
             {responder.rating}

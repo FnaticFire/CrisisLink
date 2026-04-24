@@ -19,7 +19,6 @@ const BottomNav = () => {
     { label: 'Home', icon: Home, path: '/' },
     { label: 'Alerts', icon: ShieldAlert, path: '/alerts', badge: activeAlert ? '!' : undefined },
     { label: 'Map', icon: MapPin, path: '/map' },
-    { label: 'Chat', icon: MessageCircle, path: '/chat', badge: unreadMessages > 0 ? String(unreadMessages) : undefined },
     { label: 'Profile', icon: User, path: '/profile' },
   ];
 

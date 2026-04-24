@@ -40,15 +40,24 @@ const MapPage = () => {
       );
     }
 
-    // Fetch nearby recommendations for the map
-    const lat = currentUser?.location?.lat || 28.6139;
-    const lng = currentUser?.location?.lng || 77.2090;
-    findAllEmergencyServices(lat, lng).then(setNearbyPlaces);
-
     return () => {
       if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
     };
-  }, [currentUser?.location?.lat, currentUser?.location?.lng, updateUserLocation]);
+  }, [updateUserLocation]);
+
+  const handleFindHelpCenters = async () => {
+    const lat = currentUser?.location?.lat || 28.6139;
+    const lng = currentUser?.location?.lng || 77.2090;
+    try {
+      const places = await findAllEmergencyServices(lat, lng);
+      const hospitals = places.filter(p => p.type === 'hospital').slice(0, 2);
+      const police = places.filter(p => p.type === 'police').slice(0, 2);
+      setNearbyPlaces([...hospitals, ...police]);
+      toast.success('Found nearby help centers successfully.');
+    } catch {
+      toast.error('Failed to locate centers.');
+    }
+  };
 
   // Live ETA countdown
   useEffect(() => {
@@ -150,6 +159,10 @@ const MapPage = () => {
       <div className={`${activeAlert ? 'h-[45%]' : 'h-full'} w-full transition-all duration-700 ease-in-out relative`}>
         <MapComponent 
           nearbyPlaces={nearbyPlaces}
+          alerts={currentUser?.isVolunteer ? [
+            // Dummy volunteer target if opted
+            { id: 'v1', type: 'Medical Issue', severity: 'HIGH', userLocation: { lat: 28.62, lng: 77.21 } as any } as any
+          ] : []}
           trackingResponderId={activeAlert ? responder.id : undefined}
           trackingPos={calculateLivePos()}
         />
@@ -163,30 +176,40 @@ const MapPage = () => {
         <div className="absolute top-12 left-6 right-6 z-10 flex flex-col gap-3 pointer-events-none">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 soft-shadow flex items-center gap-3 border border-gray-100 pointer-events-auto">
             <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-            <span className="text-sm font-bold text-gray-900">Scanning for nearby responders...</span>
-          </div>
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 soft-shadow border border-gray-100 pointer-events-auto max-h-[30vh] overflow-y-auto no-scrollbar">
-            <p className="text-[10px] font-black text-gray-500 uppercase mb-2 tracking-widest">Nearby Emergency Services</p>
-            <div className="flex flex-col gap-2.5">
-              {nearbyPlaces.slice(0, 10).map((s) => (
-                <div key={s.id} className="flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-bold text-gray-800 leading-tight truncate max-w-[180px]">{s.type === 'hospital' ? '🏥' : s.type === 'police' ? '👮' : '🚒'} {s.name}</span>
-                    <span className="text-[9px] text-gray-400 font-medium">{s.distance} away</span>
-                  </div>
-                  <a href={`tel:${s.phone || '112'}`} className="text-[10px] bg-primary text-white px-3 py-1.5 rounded-xl font-black tap-effect uppercase tracking-tighter">
-                    Call
-                  </a>
-                </div>
-              ))}
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-black text-gray-400 tracking-widest uppercase">RADAR ACTIVE</p>
+              <p className="text-sm font-semibold text-gray-800 truncate">
+                {currentUser?.location?.address || 'Locating...'}
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => router.push('/')}
-            className="w-full bg-primary text-white py-4 rounded-2xl font-black text-base shadow-2xl shadow-primary/30 tap-effect active:scale-95 transition-all pointer-events-auto"
+          
+          {/* Find Help Centers Button */}
+          <button 
+            onClick={handleFindHelpCenters}
+            className="bg-primary/90 text-white font-bold py-3 w-48 rounded-xl shadow-lg pointer-events-auto tap-effect mx-auto text-xs flex justify-center items-center gap-2"
           >
-            🚨 Trigger Emergency Alert
+            <Navigation size={14} /> Find Help Centers
           </button>
+
+          {nearbyPlaces.length > 0 && (
+            <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 soft-shadow border border-gray-100 pointer-events-auto max-h-[30vh] overflow-y-auto no-scrollbar">
+              <p className="text-[10px] font-black text-gray-500 uppercase mb-2 tracking-widest">Nearby Emergency Services</p>
+              <div className="flex flex-col gap-2.5">
+                {nearbyPlaces.slice(0, 10).map((s) => (
+                  <div key={s.id} className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-[11px] font-bold text-gray-800 leading-tight truncate max-w-[180px]">{s.type === 'hospital' ? '🏥' : s.type === 'police' ? '👮' : '🚒'} {s.name}</span>
+                      <span className="text-[9px] text-gray-400 font-medium">{s.distance} away</span>
+                    </div>
+                    <a href={`tel:${s.phone || '112'}`} className="text-[10px] bg-primary text-white px-3 py-1.5 rounded-xl font-black tap-effect uppercase tracking-tighter">
+                      Call
+                    </a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

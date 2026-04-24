@@ -1,18 +1,17 @@
-export type Role = 'user' | 'responder' | 'admin';
+export type Role = 'civilian' | 'police' | 'fire' | 'hospital';
 
-export interface User {
-  id: string;
-  name: string;
+export interface UserDoc {
+  id: string; // Firebase Auth UID
+  email: string;
+  username: string;
   role: Role;
-  avatar: string;
-  location?: {
-    lat: number;
-    lng: number;
-    address: string;
-  };
+  isVolunteer: boolean;
+  isAvailable: boolean; // Relevant for responders and volunteers
+  location?: { lat: number; lng: number; address?: string }; // Last known location
+  avatar?: string;
 }
 
-export interface Responder extends User {
+export interface Responder extends UserDoc {
   experience: string;
   rating: number;
   distance: string;
@@ -20,26 +19,26 @@ export interface Responder extends User {
   status: 'online' | 'offline' | 'busy';
 }
 
-export interface Alert {
-  id: string;
+export interface AlertDoc {
+  id?: string; // Firestore Doc ID
   userId: string;
-  responderId?: string;
+  userLocation: { lat: number; lng: number };
   type: string;
-  status: 'pending' | 'dispatched' | 'active' | 'resolved';
-  severity: string;
-  location: {
-    lat: number;
-    lng: number;
-    address: string;
-  };
-  createdAt: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: 'pending' | 'accepted' | 'resolved';
+  responders: string[]; // array of responder UIDs who accepted
+  confidence: number;
+  reason: string;
+  instructions: string[];
+  createdAt: number;
 }
 
-export interface Message {
-  id: string;
+export interface ChatMessageDoc {
+  id?: string;
   alertId: string;
   senderId: string;
+  senderName: string;
   text: string;
-  timestamp: string;
-  status: 'sent' | 'read';
+  timestamp: number;
+  type: 'ai' | 'human'; // ai-generated guidance or real human chat
 }

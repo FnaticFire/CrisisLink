@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { ChevronLeft, Phone, Video, Send, CheckCheck, ShieldAlert, X } from 'lucide-react';
+import { ArrowLeft, Phone, Video, Send, CheckCheck, ShieldAlert, X } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { format } from 'date-fns';
 
@@ -42,11 +42,24 @@ const ChatPage = () => {
   const callTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const getResponder = () => {
-    if (!activeAlert) return responders[0];
+    const fallback = { id: 'r1', username: 'Dispatcher', avatar: 'https://i.pravatar.cc/150', status: 'online', role: 'responder' };
+    if (!responders || responders.length === 0) return fallback;
+    if (!activeAlert) return responders[0] || fallback;
     const type = activeAlert.type.toLowerCase();
-    if (type.includes('fire')) return responders[2];
-    if (type.includes('medical') || type.includes('doctor')) return responders[1];
-    return responders[0];
+    
+    // Filter matching type first
+    let matching = responders;
+    if (type.includes('fire')) {
+      matching = responders.filter(r => (r.description||'').toLowerCase().includes('fire') || (r.description||'').toLowerCase().includes('tactical'));
+    } else if (type.includes('medical') || type.includes('injury')) {
+      matching = responders.filter(r => (r.description||'').toLowerCase().includes('medical') || (r.description||'').toLowerCase().includes('trauma'));
+    }
+
+    if (matching.length > 0) {
+      if (matching[0].distance) matching.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
+      return matching[0];
+    }
+    return responders[0] || fallback;
   };
   const responder = getResponder();
 
@@ -152,23 +165,31 @@ const ChatPage = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 max-w-[420px] mx-auto relative overflow-hidden">
-      {/* Chat Header */}
-      <div className="bg-white px-6 pt-12 pb-4 flex items-center justify-between soft-shadow z-10">
-        <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="text-gray-400 tap-effect">
-            <ChevronLeft size={24} />
-          </button>
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full overflow-hidden relative">
-              <Image src={responder.avatar} alt={responder.name} fill className="object-cover" />
+      {/* Header */}
+      <div className="pt-12 pb-4 px-6 bg-white shrink-0 relative z-50 border-b border-gray-100 soft-shadow">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.back()}
+              className="p-2 -ml-2 bg-gray-50 text-gray-600 rounded-xl hover:bg-gray-100 hover:text-primary transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 border border-gray-100">
+                <Image
+                  src={responder?.avatar || 'https://i.pravatar.cc/150'}
+                  alt={responder?.username || 'Dispatcher'}
+                  fill
+                  className="object-cover"
+                />
+                <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-white rounded-full ${responder?.status === 'online' ? 'bg-green-500' : 'bg-orange-500'}`} />
+              </div>
+              <div className="flex flex-col">
+                <h2 className="text-sm font-bold text-gray-900">{responder?.username || 'Dispatcher'}</h2>
+                <span className="text-[10px] font-black text-primary uppercase tracking-widest">{responder?.role || 'Responder'}</span>
+              </div>
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
-          </div>
-          <div>
-            <h3 className="text-sm font-black text-gray-900 leading-tight truncate max-w-[130px]">{responder.name}</h3>
-            <p className="text-[10px] font-bold text-green-500 uppercase tracking-widest">
-              {isTyping ? '✍️ Typing...' : 'Responder • Online'}
-            </p>
           </div>
         </div>
         <div className="flex items-center gap-4 text-gray-400">

@@ -6,7 +6,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAppStore } from '@/lib/store';
 import { NearbyPlace } from '@/lib/places';
-import { Alert } from '@/lib/types';
+import { AlertDoc } from '@/lib/types';
 
 // Icons
 const icon = L.icon({
@@ -44,7 +44,7 @@ const recommendationIcon = (type: string) => {
 
 interface MapComponentProps {
   nearbyPlaces?: NearbyPlace[];
-  alerts?: Alert[];
+  alerts?: AlertDoc[];
   trackingResponderId?: string;
   trackingPos?: [number, number];
 }
@@ -86,7 +86,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
       {alerts.map(alert => (
         <Marker 
           key={alert.id} 
-          position={[alert.location.lat, alert.location.lng]} 
+          position={[alert.userLocation.lat, alert.userLocation.lng]} 
           icon={getEmergencyIcon(alert.severity)}
         >
           <Popup>

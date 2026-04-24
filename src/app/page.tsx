@@ -59,8 +59,8 @@ export default function Home() {
   const filteredResponders = searchQuery
     ? responders.filter(
         (r) =>
-          r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          r.description.toLowerCase().includes(searchQuery.toLowerCase())
+          (r.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (r.description || '').toLowerCase().includes(searchQuery.toLowerCase())
       )
     : responders;
 

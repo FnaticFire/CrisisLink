@@ -5,6 +5,7 @@ import { Mic, Camera, X, ShieldAlert, Check, AlertCircle, Loader2, Radio } from 
 import { transcribeAudio, analyzeEmergencyImage, classifyEmergency, AIDetectionResult } from '@/lib/ai/detection';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 interface EmergencyTriggerProps {
   onClose: () => void;
@@ -19,6 +20,7 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setActiveAlert, currentUser } = useAppStore();
+  const router = useRouter();
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -52,8 +54,15 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
       finalTranscript = e.results[0][0].transcript;
     };
 
+    recognition.onerror = (e: any) => {
+      console.warn('Speech err:', e);
+      handleProcess('Emergency triggered via fallback (Mic error).');
+    };
+
     recognition.onend = () => {
-      handleProcess(finalTranscript || 'Emergency triggered. Need assistance.');
+      if (finalTranscript) {
+        handleProcess(finalTranscript);
+      }
     };
 
     try {
@@ -135,6 +144,7 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
     setActiveAlert(newAlert);
     toast.success(`🚨 ${aiResult.emergencyType} reported. Help is on the way!`);
     onClose();
+    router.push('/active');
   };
 
   const formatTime = (s: number) => {
