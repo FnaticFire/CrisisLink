@@ -90,7 +90,7 @@ export default function ActiveEmergencyPage() {
         <MapComponent 
           alerts={[activeAlert]} 
           trackingResponderId="mock-resp"
-          trackingPos={[activeAlert.location.lat + (0.01 * (eta / 240)), activeAlert.location.lng + (0.01 * (eta / 240))]}
+          trackingPos={[activeAlert.userLocation.lat + (0.01 * (eta / 240)), activeAlert.userLocation.lng + (0.01 * (eta / 240))]}
         />
         <div className="absolute top-0 w-full h-24 bg-gradient-to-b from-black/80 to-transparent z-10 pointer-events-none" />
         <div className="absolute top-6 left-6 z-10 pointer-events-none flex flex-col gap-2">

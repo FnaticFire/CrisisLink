@@ -46,23 +46,34 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
 
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
-    recognition.lang = 'en-IN';
-    recognition.interimResults = false;
+    recognition.lang = 'en-US'; // Broad support
+    recognition.continuous = true;
+    recognition.interimResults = true;
     let finalTranscript = '';
+    let isProcessed = false;
 
     recognition.onresult = (e: any) => {
-      finalTranscript = e.results[0][0].transcript;
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; ++i) {
+        if (e.results[i].isFinal) {
+          finalTranscript += e.results[i][0].transcript + ' ';
+        } else {
+          interim += e.results[i][0].transcript;
+        }
+      }
     };
 
     recognition.onerror = (e: any) => {
       console.warn('Speech err:', e);
+      if (isProcessed) return;
+      isProcessed = true;
       handleProcess('Emergency triggered via fallback (Mic error).');
     };
 
     recognition.onend = () => {
-      if (finalTranscript) {
-        handleProcess(finalTranscript);
-      }
+      if (isProcessed) return;
+      isProcessed = true;
+      handleProcess(finalTranscript.trim() || 'Emergency triggered. Need assistance.');
     };
 
     try {
@@ -137,7 +148,7 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
       type: aiResult.emergencyType,
       status: 'pending' as any,
       severity: aiResult.severity.toLowerCase() as any,
-      location: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
+      userLocation: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
       createdAt: new Date().toISOString(),
     };
 

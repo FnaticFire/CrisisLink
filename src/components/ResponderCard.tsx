@@ -27,7 +27,7 @@ const ResponderCard: React.FC<ResponderCardProps> = ({ responder }) => {
       type: 'emergency',
       status: 'dispatched' as const,
       severity: 'high' as const,
-      location: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
+      userLocation: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
       createdAt: new Date().toISOString(),
     };
 
@@ -56,7 +56,7 @@ const ResponderCard: React.FC<ResponderCardProps> = ({ responder }) => {
         type: 'General Inquiry',
         status: 'active',
         severity: 'low',
-        location: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
+        userLocation: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
         createdAt: new Date().toISOString(),
       });
     }

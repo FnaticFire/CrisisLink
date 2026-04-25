@@ -66,12 +66,14 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
     : [28.6139, 77.2090]; // Default New Delhi
 
   return (
-    <MapContainer 
-      center={center} 
-      zoom={15} 
-      className="h-full w-full z-0"
-      zoomControl={false}
-    >
+    <div style={{ height: "100%", width: "100%", minHeight: "100vh", position: "relative" }}>
+      <MapContainer 
+        center={center} 
+        zoom={15} 
+        style={{ height: "100%", width: "100%" }}
+        className="z-0"
+        zoomControl={false}
+      >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -132,6 +134,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
         }
       `}</style>
     </MapContainer>
+    </div>
   );
 };
 

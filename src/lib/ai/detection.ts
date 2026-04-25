@@ -203,15 +203,15 @@ function ruleBasedFallback(transcript: string, labels: string[]): AIDetectionRes
     };
   }
 
-  if (combined.includes('accident') || combined.includes('crash') || combined.includes('hurt') || combined.includes('blood')) {
+  if (combined.includes('heart attack') || combined.includes('medical') || combined.includes('head injury') || combined.includes('accident') || combined.includes('crash') || combined.includes('hurt') || combined.includes('blood') || combined.includes('injury') || combined.includes('stroke') || combined.includes('breathing')) {
     return {
-      emergencyType: 'Road Accident / Medical',
+      emergencyType: 'Medical Emergency',
       severity: 'HIGH',
-      confidence: 87,
-      reason: 'Trauma and injury indicators detected.',
+      confidence: 90,
+      reason: 'Medical distress or trauma components detected in analysis.',
       instructions: [
         'Do NOT move the injured person unless in immediate danger.',
-        'Apply firm pressure to any bleeding wounds.',
+        'Apply firm pressure to any bleeding wounds. Start CPR if unresponsive.',
         'Call 108 (Ambulance) immediately and stay on the line.',
       ],
     };
@@ -231,7 +231,8 @@ function ruleBasedFallback(transcript: string, labels: string[]): AIDetectionRes
     };
   }
 
-  if (combined.includes('attack') || combined.includes('violence') || combined.includes('robbery') || combined.includes('knife') || combined.includes('gun')) {
+  const isViolence = combined.includes('violence') || combined.includes('robbery') || combined.includes('knife') || combined.includes('gun') || (combined.includes('attack') && !combined.includes('heart'));
+  if (isViolence) {
     return {
       emergencyType: 'Violence / Security Threat',
       severity: 'CRITICAL',
