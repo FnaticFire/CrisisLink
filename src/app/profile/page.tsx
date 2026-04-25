@@ -175,18 +175,10 @@ const ProfilePage = () => {
 
       {/* Logout */}
       <div className="mt-8 px-6">
-        <button
-          onClick={() => toast.error('Sign out not required — no auth in demo mode.')}
-          className="w-full flex items-center justify-center gap-3 py-4 bg-red-50 text-primary border border-red-100 rounded-2xl font-bold transition-all hover:bg-primary hover:text-white tap-effect"
-        >
-          <LogOut size={20} />
-          Sign Out
-        </button>
       </div>
 
       <div className="mt-8 px-6 text-center">
-        <p className="text-[10px] text-gray-300 font-bold uppercase tracking-[0.3em]">CrisisLink v1.0.4 • Demo Mode</p>
-        <p className="text-[9px] text-gray-200 mt-1">Signed in as John Doe (No auth required)</p>
+        <p className="text-[10px] text-gray-300 font-bold uppercase tracking-[0.3em]">CrisisLink v1.0.4</p>
       </div>
 
       {/* ── Edit Profile Modal ── */}

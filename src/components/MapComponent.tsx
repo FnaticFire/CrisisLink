@@ -66,7 +66,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
     : [28.6139, 77.2090]; // Default New Delhi
 
   return (
-    <div style={{ height: "100%", width: "100%", minHeight: "100vh", position: "relative" }}>
+    <div style={{ height: "100%", width: "100%", position: "relative" }}>
       <MapContainer 
         center={center} 
         zoom={15} 

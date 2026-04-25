@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 const AlertsPage = () => {
-  const { activeAlert, alertHistory, setActiveAlert, responders, resolveAlert } = useAppStore();
+  const { currentUser, activeAlert, alertHistory, setActiveAlert, responders, resolveAlert } = useAppStore();
   const router = useRouter();
   const [selectedRecord, setSelectedRecord] = useState<null | typeof alertHistory[0]>(null);
 
@@ -55,15 +55,17 @@ const AlertsPage = () => {
                 >
                   Open Chat
                 </Link>
-                <button
-                  onClick={() => {
-                    resolveAlert();
-                  }}
-                  className="px-3 bg-green-50 text-green-600 border border-green-200 rounded-xl text-xs font-black tap-effect"
-                  title="Mark Resolved"
-                >
-                  ✓ Done
-                </button>
+                {currentUser && (currentUser.role !== 'civilian' || currentUser.isVolunteer) && (
+                  <button
+                    onClick={() => {
+                      resolveAlert();
+                    }}
+                    className="px-3 bg-green-50 text-green-600 border border-green-200 rounded-xl text-xs font-black tap-effect"
+                    title="Mark Resolved"
+                  >
+                    ✓ Done
+                  </button>
+                )}
               </div>
             </div>
           ) : (

@@ -154,7 +154,7 @@ const MapPage = () => {
   };
 
   return (
-    <div className="flex flex-col flex-1 h-screen bg-white relative overflow-hidden">
+    <div className="flex flex-col h-[100dvh] w-full bg-[#1a1a1a] relative overflow-hidden">
       {/* Map Section */}
       <div className={`${activeAlert ? 'h-[45%]' : 'h-full'} w-full transition-all duration-700 ease-in-out relative`}>
         <MapComponent 
