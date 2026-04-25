@@ -46,7 +46,10 @@ export const useAppStore = create<AppState>((set) => ({
   setActiveAlertId: (id) => set({ activeAlertId: id }),
   setActiveAlert: (alert) => set({ activeAlert: alert }),
   resolveAlert: () => set({ activeAlert: null }),
-  updateUserLocation: (lat, lng, addr) => set({ currentLocation: { lat, lng, address: addr } }),
+  updateUserLocation: (lat, lng, addr) => set((state) => ({ 
+    currentLocation: { lat, lng, address: addr },
+    currentUser: state.currentUser ? { ...state.currentUser, location: { lat, lng, address: addr } } : null
+  })),
   markNotificationsRead: () => set((state) => ({ notifications: state.notifications.map(n => ({ ...n, read: true })) })),
   addMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
   markMessagesRead: () => {}, // Mock stub

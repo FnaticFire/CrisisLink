@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Bell, Search, X, Check } from 'lucide-react';
-import { MapPin, RefreshCw, LogOut } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Bell, Search, X, Check, MapPin, RefreshCw, LogOut } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import { setDebugField, debugLog, debugError, DEBUG } from '@/lib/debug';
+import { toast } from 'react-hot-toast';
 
 interface TopBarProps {
   showSearch?: boolean;
@@ -26,38 +27,65 @@ const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuer
     if (!showNotifs) markNotificationsRead();
   };
 
-  const handleRefreshLocation = () => {
-    if (!('geolocation' in navigator)) return;
+  const refreshLocation = useCallback(() => {
+    if (!('geolocation' in navigator)) {
+      setDebugField({ gps: 'FAILED' });
+      if (DEBUG) toast.error('Geolocation API not available in this browser.');
+      return;
+    }
     setIsRefreshing(true);
+    setDebugField({ gps: 'PENDING' });
+
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        debugLog('GPS', `Coords: ${lat}, ${lng}`);
+
         try {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
-            headers: { 'Accept-Language': 'en' }
-          });
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
           const data = await res.json();
-          let placeName = 'Locating...';
-          
-          if (data && data.address) {
-            placeName = data.address.neighbourhood || data.address.suburb || data.address.city_district || data.address.city || data.address.town || 'New Delhi';
-            if (data.address.city) placeName += ', ' + data.address.city;
+          let placeName = 'Your Location';
+
+          if (data?.address) {
+            const a = data.address;
+            placeName = a.neighbourhood || a.suburb || a.city_district || a.city || a.town || 'Your Area';
+            if (a.city && placeName !== a.city) placeName += ', ' + a.city;
           }
-          
+
           updateUserLocation(lat, lng, placeName);
+          setDebugField({ gps: 'ACTIVE' });
+          debugLog('GPS', `Resolved: ${placeName}`);
         } catch (err) {
-          updateUserLocation(pos.coords.latitude, pos.coords.longitude, 'Location Updated');
+          debugError('GPS', 'Reverse geocode failed:', err);
+          updateUserLocation(lat, lng, 'Location Updated');
+          setDebugField({ gps: 'ACTIVE' });
         } finally {
           setIsRefreshing(false);
         }
       },
-      () => {
+      (err) => {
+        debugError('GPS', 'Permission denied or timeout:', err.message);
+        setDebugField({ gps: 'FAILED' });
         setIsRefreshing(false);
+        if (DEBUG) toast.error(`GPS Failed: ${err.message}`);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
-  };
+  }, [updateUserLocation]);
+
+  // Auto-request GPS on mount if user has no location
+  useEffect(() => {
+    if (!currentUser?.location) {
+      refreshLocation();
+    } else {
+      setDebugField({ gps: 'ACTIVE' });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSignOut = () => {
     setCurrentUser(null);
@@ -71,18 +99,22 @@ const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuer
           <span className="text-xs text-gray-400 font-medium tracking-wide flex items-center gap-1">
             <MapPin size={12} className="text-primary" />
             YOUR LOCATION
-            <button onClick={handleRefreshLocation} disabled={isRefreshing} className="ml-1 p-1 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50">
+            <button
+              onClick={refreshLocation}
+              disabled={isRefreshing}
+              className="ml-1 p-1 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50"
+            >
               <RefreshCw size={12} className={`text-gray-500 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
           </span>
           <h2 className="text-sm font-semibold text-gray-800 truncate max-w-[180px]">
-            {currentUser?.location?.address || 'Connaught Place, New Delhi'}
+            {currentUser?.location?.address || 'Locating...'}
           </h2>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={handleSignOut}
-            className="p-2.5 bg-red-50 rounded-full text-red-500 soft-shadow tap-effect flex items-center gap-1"
+            className="p-2.5 bg-red-50 rounded-full text-red-500 soft-shadow tap-effect"
             title="Sign Out"
           >
             <LogOut size={16} />
@@ -112,7 +144,7 @@ const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuer
           {searchQuery && (
             <button
               onClick={() => onSearch?.('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
             >
               <X size={16} />
             </button>
@@ -120,13 +152,13 @@ const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuer
         </div>
       )}
 
-      {/* Notification Dropdown */}
+      {/* Notifications Dropdown */}
       {showNotifs && (
-        <div className="absolute top-16 right-6 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in slide-in-from-top-5 duration-200">
-          <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
-            <span className="text-xs font-black text-gray-600 uppercase tracking-widest">Notifications</span>
-            <button onClick={() => setShowNotifs(false)}>
-              <X size={16} className="text-gray-400" />
+        <div className="absolute top-[100%] right-6 w-80 bg-white rounded-2xl border border-gray-100 shadow-2xl z-50 max-h-[60vh] overflow-y-auto no-scrollbar animate-in slide-in-from-top-5 duration-200">
+          <div className="p-4 border-b border-gray-50 flex items-center justify-between">
+            <h3 className="font-black text-gray-900 text-sm">Notifications</h3>
+            <button onClick={() => setShowNotifs(false)} className="text-gray-400 p-1">
+              <X size={16} />
             </button>
           </div>
           {notifications.length === 0 ? (

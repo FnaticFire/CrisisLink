@@ -1,26 +1,28 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Camera, X, ShieldAlert, Check, AlertCircle, Loader2, Radio } from 'lucide-react';
-import { transcribeAudio, analyzeEmergencyImage, classifyEmergency, AIDetectionResult } from '@/lib/ai/detection';
+import { Mic, Camera, X, ShieldAlert, Check, AlertCircle, Loader2, Radio, Type } from 'lucide-react';
+import { analyzeEmergencyImage, classifyEmergency, AIDetectionResult } from '@/lib/ai/detection';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { canTriggerAlert, canCallAI, incrementAlertCount, incrementAICount, setDebugField, debugLog, debugError, DEBUG } from '@/lib/debug';
 
 interface EmergencyTriggerProps {
   onClose: () => void;
 }
 
 const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
-  const [step, setStep] = useState<'selecting' | 'recording' | 'processing' | 'confirming'>('selecting');
+  const [step, setStep] = useState<'selecting' | 'text' | 'recording' | 'processing' | 'confirming'>('selecting');
   const [recordTime, setRecordTime] = useState(0);
   const [aiResult, setAiResult] = useState<AIDetectionResult | null>(null);
   const [processingStep, setProcessingStep] = useState('Listening to voice...');
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [textInput, setTextInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setActiveAlert, currentUser } = useAppStore();
   const router = useRouter();
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -30,76 +32,105 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
     return () => clearInterval(interval);
   }, [step]);
 
-  const recognitionRef = useRef<any>(null);
+  // ── Rate Limit Check ──
+  const checkRateLimits = (): boolean => {
+    if (!canTriggerAlert()) {
+      toast.error('⚠️ Rate Limit: Max 3 alerts per session reached.');
+      return false;
+    }
+    if (!canCallAI()) {
+      toast.error('⚠️ Rate Limit: Max 10 AI calls per session reached.');
+      return false;
+    }
+    return true;
+  };
 
   // ── Voice Recording via Web Speech API ──
   const handleStartRecording = () => {
+    if (!checkRateLimits()) return;
     setStep('recording');
     setRecordTime(0);
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      toast.error('Voice not supported. Using AI fallback inference.');
-      handleProcess('I have a critical emergency, please dispatch help.');
+      toast.error('🎤 Speech Recognition not supported. Use text or image input.');
+      if (DEBUG) debugError('Speech', 'Web Speech API not available');
+      setStep('text'); // Fallback to text input
       return;
     }
 
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
-    recognition.lang = 'en-US'; // Broad support
+    recognition.lang = 'en-US';
     recognition.continuous = true;
     recognition.interimResults = true;
     let finalTranscript = '';
     let isProcessed = false;
 
     recognition.onresult = (e: any) => {
-      let interim = '';
       for (let i = e.resultIndex; i < e.results.length; ++i) {
         if (e.results[i].isFinal) {
           finalTranscript += e.results[i][0].transcript + ' ';
-        } else {
-          interim += e.results[i][0].transcript;
         }
       }
     };
 
     recognition.onerror = (e: any) => {
-      console.warn('Speech err:', e);
+      debugError('Speech', 'Recognition error:', e.error);
+      if (DEBUG) toast.error(`🎤 Speech API Error: ${e.error}`);
       if (isProcessed) return;
       isProcessed = true;
-      handleProcess('Emergency triggered via fallback (Mic error).');
+      setStep('text'); // Fallback to text
     };
 
     recognition.onend = () => {
       if (isProcessed) return;
       isProcessed = true;
-      handleProcess(finalTranscript.trim() || 'Emergency triggered. Need assistance.');
+      const transcript = finalTranscript.trim();
+      if (transcript) {
+        debugLog('Speech', 'Transcript:', transcript);
+        handleProcess(transcript);
+      } else {
+        toast.error('🎤 No speech detected. Try text input.');
+        setStep('text');
+      }
     };
 
     try {
       recognition.start();
-    } catch {
-      handleProcess('Emergency triggered via fallback.');
+      debugLog('Speech', 'Recording started');
+    } catch (err) {
+      debugError('Speech', 'Failed to start:', err);
+      if (DEBUG) toast.error('🎤 Microphone access failed.');
+      setStep('text');
     }
 
     // Auto-stop after 8 seconds
     setTimeout(() => {
-      try {
-        if (recognitionRef.current) recognitionRef.current.stop();
-      } catch {}
+      try { if (recognitionRef.current) recognitionRef.current.stop(); } catch {}
     }, 8000);
   };
 
   const handleStopRecording = () => {
-    try {
-      if (recognitionRef.current) recognitionRef.current.stop();
-    } catch {}
+    try { if (recognitionRef.current) recognitionRef.current.stop(); } catch {}
+  };
+
+  // ── Text Submit ──
+  const handleTextSubmit = () => {
+    if (!textInput.trim()) {
+      toast.error('Please describe your emergency.');
+      return;
+    }
+    if (!checkRateLimits()) return;
+    debugLog('Text', 'Submitted:', textInput);
+    handleProcess(textInput.trim());
   };
 
   // ── Image Upload ──
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!checkRateLimits()) return;
 
     const reader = new FileReader();
     reader.onload = async (ev) => {
@@ -109,14 +140,22 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
       setProcessingStep('Analyzing scene with Gemini Vision...');
 
       try {
+        incrementAICount();
         const labels = await analyzeEmergencyImage(base64);
-        setProcessingStep('Classifying emergency with Grok AI...');
+        debugLog('Vision', 'Labels:', labels);
+        setDebugField({ ai: 'ACTIVE' });
+
+        setProcessingStep('Classifying emergency with AI...');
+        incrementAICount();
         const result = await classifyEmergency('Image-based emergency report', labels);
+        debugLog('Classify', 'Result:', result);
         setAiResult(result);
         setStep('confirming');
       } catch (err) {
-        toast.error('Image analysis failed.');
-        onClose();
+        debugError('Vision', 'Image analysis failed:', err);
+        setDebugField({ ai: 'FAILED' });
+        toast.error('❌ Vision API failed. Please try text or voice input.');
+        setStep('selecting');
       }
     };
     reader.readAsDataURL(file);
@@ -125,22 +164,28 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
   // ── Main AI Processing Pipeline ──
   const handleProcess = async (transcript: string) => {
     setStep('processing');
+    setProcessingStep('Classifying emergency with AI...');
 
     try {
-      setProcessingStep('Classifying emergency with Grok AI...');
+      incrementAICount();
       const result = await classifyEmergency(transcript, ['Distress', 'Voice Command']);
-
+      debugLog('Classify', 'Result:', result);
+      setDebugField({ ai: 'ACTIVE' });
       setAiResult(result);
       setStep('confirming');
     } catch (error) {
-      toast.error('AI Analysis failed. Please try again.');
-      onClose();
+      debugError('Classify', 'AI processing failed:', error);
+      setDebugField({ ai: 'FAILED' });
+      toast.error('❌ AI Processing Failed. Check console for details.');
+      setStep('selecting');
     }
   };
 
   // ── Confirm & Create Alert ──
   const handleConfirm = () => {
     if (!aiResult) return;
+
+    incrementAlertCount();
 
     const newAlert = {
       id: 'alert-' + Date.now(),
@@ -178,14 +223,7 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
       </button>
 
       {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleImageUpload}
-      />
+      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageUpload} />
 
       <div className="flex-1 flex flex-col justify-center items-center text-center">
 
@@ -200,33 +238,59 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
               <p className="text-white/60">Choose your input method for AI detection</p>
             </div>
 
-            <div className="flex gap-6 w-full max-w-sm">
+            <div className="flex gap-4 w-full max-w-sm flex-wrap justify-center">
               <button
                 onClick={handleStartRecording}
-                className="flex-1 bg-white/10 hover:bg-white/20 border border-white/10 py-6 rounded-3xl flex flex-col items-center gap-3 transition-all tap-effect active:scale-95"
+                className="flex-1 min-w-[100px] bg-white/10 hover:bg-white/20 border border-white/10 py-6 rounded-3xl flex flex-col items-center gap-3 transition-all tap-effect active:scale-95"
               >
-                <div className="p-4 bg-primary/20 rounded-2xl text-primary">
-                  <Mic size={32} />
-                </div>
+                <div className="p-4 bg-primary/20 rounded-2xl text-primary"><Mic size={28} /></div>
                 <span className="text-sm font-bold text-white uppercase tracking-widest">Voice</span>
-                <span className="text-[10px] text-white/40">Speak your emergency</span>
+                <span className="text-[10px] text-white/40">Speak it</span>
               </button>
-
+              <button
+                onClick={() => setStep('text')}
+                className="flex-1 min-w-[100px] bg-white/10 hover:bg-white/20 border border-white/10 py-6 rounded-3xl flex flex-col items-center gap-3 transition-all tap-effect active:scale-95"
+              >
+                <div className="p-4 bg-emerald-500/20 rounded-2xl text-emerald-400"><Type size={28} /></div>
+                <span className="text-sm font-bold text-white uppercase tracking-widest">Text</span>
+                <span className="text-[10px] text-white/40">Type it</span>
+              </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1 bg-white/10 hover:bg-white/20 border border-white/10 py-6 rounded-3xl flex flex-col items-center gap-3 transition-all tap-effect active:scale-95"
+                className="flex-1 min-w-[100px] bg-white/10 hover:bg-white/20 border border-white/10 py-6 rounded-3xl flex flex-col items-center gap-3 transition-all tap-effect active:scale-95"
               >
-                <div className="p-4 bg-blue-500/20 rounded-2xl text-blue-400">
-                  <Camera size={32} />
-                </div>
+                <div className="p-4 bg-blue-500/20 rounded-2xl text-blue-400"><Camera size={28} /></div>
                 <span className="text-sm font-bold text-white uppercase tracking-widest">Image</span>
-                <span className="text-[10px] text-white/40">Gemini Vision AI</span>
+                <span className="text-[10px] text-white/40">Snap it</span>
               </button>
             </div>
           </div>
         )}
 
-        {/* ── STEP 2: Recording ── */}
+        {/* ── STEP: Text Input ── */}
+        {step === 'text' && (
+          <div className="flex flex-col items-center gap-6 w-full max-w-sm animate-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center">
+              <Type size={40} className="text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-white mb-1">Describe Your Emergency</h2>
+              <p className="text-white/40 text-sm">Be specific: what happened, injuries, location details</p>
+            </div>
+            <textarea
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              placeholder='e.g. "There is a fire in my building, 3rd floor. Smoke everywhere."'
+              className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-2xl px-4 py-4 outline-none focus:border-emerald-500/50 resize-none h-32 placeholder:text-white/20"
+            />
+            <div className="flex gap-3 w-full">
+              <button onClick={() => setStep('selecting')} className="flex-1 bg-white/10 text-white py-3 rounded-xl font-bold text-sm">Back</button>
+              <button onClick={handleTextSubmit} disabled={!textInput.trim()} className="flex-1 bg-emerald-500 disabled:opacity-40 text-white py-3 rounded-xl font-black text-sm active:scale-95 transition-all">Analyze</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP: Recording ── */}
         {step === 'recording' && (
           <div className="flex flex-col items-center gap-8">
             <div className="relative">
@@ -236,24 +300,19 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
               </div>
             </div>
             <div className="text-center">
-              <h2 className="text-5xl font-black text-white mb-2 tabular-nums tracking-tight">
-                {formatTime(recordTime)}
-              </h2>
+              <h2 className="text-5xl font-black text-white mb-2 tabular-nums tracking-tight">{formatTime(recordTime)}</h2>
               <p className="text-primary font-black uppercase tracking-widest animate-pulse flex items-center gap-2 justify-center">
                 <Radio size={14} /> Recording distress call...
               </p>
-              <p className="text-white/30 text-xs mt-2">Auto-stops at 8s • Web Speech API active</p>
+              <p className="text-white/30 text-xs mt-2">Auto-stops at 8s • Web Speech API</p>
             </div>
-            <button
-              onClick={handleStopRecording}
-              className="px-8 py-3 bg-white/10 border border-white/20 rounded-2xl text-white font-bold hover:bg-white/20 transition-all"
-            >
+            <button onClick={handleStopRecording} className="px-8 py-3 bg-white/10 border border-white/20 rounded-2xl text-white font-bold hover:bg-white/20 transition-all">
               Stop &amp; Analyze
             </button>
           </div>
         )}
 
-        {/* ── STEP 3: Processing ── */}
+        {/* ── STEP: Processing ── */}
         {step === 'processing' && (
           <div className="flex flex-col items-center gap-6">
             {imagePreview && (
@@ -277,16 +336,14 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
           </div>
         )}
 
-        {/* ── STEP 4: Confirm ── */}
+        {/* ── STEP: Confirm ── */}
         {step === 'confirming' && aiResult && (
           <div className="w-full max-w-sm bg-white rounded-[32px] p-8 animate-in slide-in-from-bottom-10 duration-500">
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 ${severityColor[aiResult.severity]}`}>
               <AlertCircle size={32} />
             </div>
 
-            <h2 className="text-2xl font-black text-gray-900 mb-2">
-              {aiResult.emergencyType}
-            </h2>
+            <h2 className="text-2xl font-black text-gray-900 mb-2">{aiResult.emergencyType}</h2>
 
             <div className="flex items-center gap-2 mb-4">
               <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${severityColor[aiResult.severity]}`}>
@@ -297,7 +354,6 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
 
             <p className="text-gray-500 text-sm leading-relaxed mb-4">{aiResult.reason}</p>
 
-            {/* Safety Instructions */}
             <div className="bg-amber-50 rounded-2xl p-4 mb-6">
               <p className="text-xs font-black text-amber-700 uppercase mb-2">⚡ Immediate Instructions</p>
               <ol className="flex flex-col gap-1.5">
@@ -310,21 +366,13 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
               </ol>
             </div>
 
-            <p className="text-sm font-bold text-gray-900 mb-4 text-center">
-              Should we dispatch help now?
-            </p>
+            <p className="text-sm font-bold text-gray-900 mb-4 text-center">Should we dispatch help now?</p>
 
             <div className="flex flex-col gap-3">
-              <button
-                onClick={handleConfirm}
-                className="w-full bg-primary text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 tap-effect active:scale-95"
-              >
+              <button onClick={handleConfirm} className="w-full bg-primary text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 tap-effect active:scale-95">
                 <Check size={20} /> YES, DISPATCH HELP
               </button>
-              <button
-                onClick={onClose}
-                className="w-full bg-gray-100 text-gray-400 py-4 rounded-2xl font-bold tap-effect"
-              >
+              <button onClick={onClose} className="w-full bg-gray-100 text-gray-400 py-4 rounded-2xl font-bold tap-effect">
                 CANCEL
               </button>
             </div>
@@ -333,9 +381,7 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
       </div>
 
       <style jsx>{`
-        .pulse-red {
-          animation: pulse-red 2s infinite;
-        }
+        .pulse-red { animation: pulse-red 2s infinite; }
         @keyframes pulse-red {
           0% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.4); }
           70% { box-shadow: 0 0 0 24px rgba(229, 57, 53, 0); }

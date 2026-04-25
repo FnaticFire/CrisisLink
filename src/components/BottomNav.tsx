@@ -3,27 +3,25 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ShieldAlert, MapPin, User, MessageCircle } from 'lucide-react';
+import { Home, ShieldAlert, MapPin, User } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 
 const BottomNav = () => {
   const pathname = usePathname();
-  const { messages, currentUser, activeAlert } = useAppStore();
+  const { currentUser, activeAlert } = useAppStore();
 
-  // Count unread messages (from responder, not from user)
-  const unreadMessages = messages.filter(
-    (m) => m.senderId !== currentUser?.id && m.status !== 'read'
-  ).length;
+  // Hide bottom nav on these routes
+  if (pathname === '/chat' || pathname === '/active' || pathname === '/login') return null;
+
+  const isCivilian = currentUser?.role === 'civilian';
 
   const navItems = [
     { label: 'Home', icon: Home, path: '/' },
-    { label: 'Alerts', icon: ShieldAlert, path: '/alerts', badge: activeAlert ? '!' : undefined },
+    // Alerts tab is ONLY visible for civilians
+    ...(isCivilian ? [{ label: 'Alerts', icon: ShieldAlert, path: '/alerts', badge: activeAlert ? '!' : undefined }] : []),
     { label: 'Map', icon: MapPin, path: '/map' },
     { label: 'Profile', icon: User, path: '/profile' },
   ];
-
-  // Hide bottom nav on chat page or active emergency
-  if (pathname === '/chat' || pathname === '/active' || pathname === '/login') return null;
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] bg-white/90 backdrop-blur-lg border-t border-gray-100 flex justify-around py-3 px-2 z-50 rounded-t-2xl soft-shadow">
@@ -41,7 +39,7 @@ const BottomNav = () => {
           >
             <div className="relative">
               <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-              {item.badge && (
+              {'badge' in item && item.badge && (
                 <span className="absolute -top-1.5 -right-2 w-4 h-4 bg-primary text-white text-[8px] font-black flex items-center justify-center rounded-full border border-white">
                   {item.badge}
                 </span>

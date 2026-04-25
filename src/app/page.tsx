@@ -43,20 +43,7 @@ export default function Home() {
     }
   }, [currentUser, router]);
 
-  React.useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          updateUserLocation(
-            position.coords.latitude,
-            position.coords.longitude,
-            'Your Current Location'
-          );
-        },
-        () => {}
-      );
-    }
-  }, [updateUserLocation]);
+
 
   const quickActions = [
     { label: 'Emergency', icon: ShieldAlert, color: 'bg-red-50 text-red-500', action: () => setShowTrigger(true) },
@@ -173,9 +160,10 @@ export default function Home() {
                 <ResponderCard key={responder.id} responder={responder} />
               ))
             ) : (
-              <div className="text-center py-8 text-gray-400">
-                <Users size={32} className="mx-auto mb-2 opacity-40" />
-                <p className="text-sm font-medium">No responders found for your search</p>
+              <div className="text-center py-10 bg-gray-50 rounded-2xl border border-gray-100">
+                <Users size={32} className="mx-auto mb-3 opacity-30 text-gray-400" />
+                <p className="text-sm font-bold text-gray-400">No responders nearby</p>
+                <p className="text-xs text-gray-300 mt-1">Responders will appear when they register and are within range.</p>
               </div>
             )}
           </div>

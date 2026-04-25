@@ -4,6 +4,7 @@ import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import { Toaster } from "react-hot-toast";
 import FirebaseInit from "@/components/FirebaseInit";
+import DebugBar from "@/components/DebugBar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,6 +22,7 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <body className={`${inter.className} min-h-full`} suppressHydrationWarning>
         <FirebaseInit />
+        <DebugBar />
         <div className="app-container overflow-hidden">
           {children}
           <BottomNav />

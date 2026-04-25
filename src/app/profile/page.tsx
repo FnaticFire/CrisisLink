@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
+import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
 import {
   History,
   MapPin,
@@ -20,6 +21,7 @@ import { useAppStore } from '@/lib/store';
 import { toast } from 'react-hot-toast';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 const ProfilePage = () => {
   const {
@@ -31,6 +33,7 @@ const ProfilePage = () => {
     removeSavedLocation,
     notifications,
   } = useAppStore();
+  const router = useRouter();
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -115,8 +118,10 @@ const ProfilePage = () => {
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/5 to-transparent" />
 
         <div className="relative inline-block mb-4">
-          <div className="w-24 h-24 rounded-3xl overflow-hidden border-4 border-white soft-shadow mx-auto relative">
-            <Image src={currentUser?.avatar || ''} alt="Profile" fill className="object-cover" />
+          <div className="w-24 h-24 rounded-3xl overflow-hidden border-4 border-white soft-shadow mx-auto relative bg-gradient-to-br from-primary to-red-400 flex items-center justify-center">
+            <span className="text-white text-3xl font-black">
+              {(currentUser?.username || 'U').slice(0, 2).toUpperCase()}
+            </span>
           </div>
           <button
             onClick={() => { setEditName(currentUser?.username || ''); setShowEditModal(true); }}
@@ -127,8 +132,8 @@ const ProfilePage = () => {
         </div>
 
         <h2 className="text-xl font-black text-gray-900">{currentUser?.username}</h2>
-        <p className="text-xs font-bold text-primary uppercase tracking-[0.2em] mt-1">Premium User</p>
-        <p className="text-xs text-gray-400 mt-1">📍 {currentUser?.location?.address || 'New Delhi, India'}</p>
+        <p className="text-xs font-bold text-primary uppercase tracking-[0.2em] mt-1">{currentUser?.role === 'civilian' ? (currentUser?.isVolunteer ? 'Civilian • Volunteer' : 'Civilian') : currentUser?.role?.toUpperCase()}</p>
+        <p className="text-xs text-gray-400 mt-1">📍 {currentUser?.location?.address || 'Locating...'}</p>
       </div>
 
       {/* Stats */}
@@ -173,12 +178,18 @@ const ProfilePage = () => {
         ))}
       </div>
 
-      {/* Logout */}
+      {/* Sign Out */}
       <div className="mt-8 px-6">
+        <button
+          onClick={async () => { try { await signOut(auth); } catch {} useAppStore.getState().setCurrentUser(null); router.push('/login'); }}
+          className="w-full flex items-center justify-center gap-3 py-4 bg-red-50 text-primary border border-red-100 rounded-2xl font-bold transition-all hover:bg-primary hover:text-white tap-effect"
+        >
+          Sign Out
+        </button>
       </div>
 
-      <div className="mt-8 px-6 text-center">
-        <p className="text-[10px] text-gray-300 font-bold uppercase tracking-[0.3em]">CrisisLink v1.0.4</p>
+      <div className="mt-4 px-6 text-center mb-8">
+        <p className="text-[10px] text-gray-300 font-bold uppercase tracking-[0.3em]">CrisisLink v1.0.5</p>
       </div>
 
       {/* ── Edit Profile Modal ── */}
