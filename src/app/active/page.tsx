@@ -121,49 +121,21 @@ export default function ActiveEmergencyPage() {
     setAiMessages(prev => [...prev, { sender: 'ai', text: '...' }]);
 
     try {
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      if (!apiKey || apiKey === 'undefined' || apiKey.length < 10) {
-        // Handle missing key gracefully in UI
-        const t = (alert.type || '').toLowerCase();
-        let fb = 'Stay in a safe location. Help is on the way.';
-        if (t.includes('fire')) fb = 'Stay low below smoke. Find exit.';
-        else if (t.includes('medical')) fb = 'Keep patient still. Monitor breathing.';
-        setAiMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text: fb }]);
-        toast.error('AI Safety Guide unavailable (API Key missing)');
-        return;
-      }
-      const genAI = new GoogleGenerativeAI(apiKey);
-      
-      let text = '';
-      try {
-        // Step 1: Try the requested Gemini 2.5 experimental model
-        const model25 = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
-        const result = await model25.generateContent(
-          `You are CrisisLink AI (Gemini 2.5), an emergency safety advisor. Emergency: ${alert.type}. User: ${msg}`
-        );
-        text = result.response.text();
-      } catch (e25) {
-        debugError('AI-2.5-Failed', e25);
-        try {
-          // Step 2: Try 1.5-flash
-          const model15 = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-          const result = await model15.generateContent(
-            `You are CrisisLink AI, an emergency advisor. Emergency: ${alert.type}. User: ${msg}`
-          );
-          text = result.response.text();
-        } catch (e15) {
-          debugError('AI-1.5-Failed', e15);
-          // Step 3: Ultimate fallback to gemini-pro (most compatible)
-          const modelPro = genAI.getGenerativeModel({ model: 'gemini-pro' });
-          const result = await modelPro.generateContent(
-            `You are CrisisLink AI, an emergency advisor. Emergency: ${alert.type}. User: ${msg}`
-          );
-          text = result.response.text();
-          toast('Using Pro-compatible fallback.', { icon: '🛡️' });
-        }
+      const response = await fetch('/api/chat/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: msg, 
+          emergencyType: alert.type 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('AI Proxy Unreachable');
       }
 
-      setAiMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text }]);
+      const data = await response.json();
+      setAiMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text: data.text || 'Safety guidance updated.' }]);
     } catch (err: any) {
       toast.error(`AI API Failed: ${err.message}. Showing static guidance.`);
       const t = (alert.type || '').toLowerCase();

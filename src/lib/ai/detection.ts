@@ -74,32 +74,17 @@ export async function analyzeEmergencyImage(imageBase64: string): Promise<string
   }
 
   try {
-    const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
-    const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
-    let data;
-    
-    for (const model of models) {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: `Analyze this emergency and classify severity (Context: 100 Safety Rules). Return ONLY JSON array of hazard labels.` },
-                { inline_data: { mime_type: 'image/jpeg', data: base64Data } },
-              ],
-            }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 150 },
-          }),
-        }
-      );
-      if (response.ok) {
-        data = await response.json();
-        break;
-      }
+    const response = await fetch('/api/vision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64 }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Vision Proxy Error: ${response.status}`);
     }
+
+    const data = await response.json();
 
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '["Emergency"]';
     const match = text.match(/\[[\s\S]*?\]/);
