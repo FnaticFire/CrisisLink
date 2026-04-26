@@ -6,6 +6,7 @@
 // ============================================================
 
 import { toast } from 'react-hot-toast';
+import { debugError } from '../debug';
 
 export interface AIDetectionResult {
   emergencyType: string;
@@ -86,7 +87,7 @@ export async function analyzeEmergencyImage(imageBase64: string): Promise<string
           body: JSON.stringify({
             contents: [{
               parts: [
-                { text: `SYSTEM_CONTEXT_CACHED_RULES: [100 Security & Safety Rules]. Identify top 10 hazards/labels in this scene. Return ONLY JSON array.` },
+                { text: `Analyze this emergency and classify severity (Context: 100 Safety Rules). Return ONLY JSON array of hazard labels.` },
                 { inline_data: { mime_type: 'image/jpeg', data: base64Data } },
               ],
             }],
@@ -128,17 +129,39 @@ export async function classifyEmergency(
     });
 
     if (!response.ok) {
-      toast.error('AI Classification Server Unreachable.');
-      return ruleBasedFallback(transcript, labels);
+      throw new Error('Server Route Failed');
     }
 
     const result = await response.json() as AIDetectionResult;
     if (result.emergencyType && result.severity) return result;
-    
-    toast.error('AI Classification Data Mismatch.');
-    return ruleBasedFallback(transcript, labels);
+    throw new Error('Invalid Data from Server');
   } catch (error: any) {
-    toast.error(`Classification AI Failed: ${error.message}`);
+    debugError('Triage-Server-Failed', error);
+    
+    // SECOND FALLBACK: Direct Client-to-Gemini Fetch (as suggested by user)
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || 'AIzaSyCWZ-PsQ2OS6WQWKRLkBj7gsqBjDVkPn8E';
+      const directResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `Classify emergency and return JSON only: { "emergencyType": "", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "confidence": 0, "reason": "", "instructions": [] } \n\nUser input: ${transcript}` }] }]
+          })
+        }
+      );
+      if (directResponse.ok) {
+        const d = await directResponse.json();
+        const t = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const m = t.match(/\{[\s\S]*\}/);
+        if (m) return JSON.parse(m[0]);
+      }
+    } catch (e2) {
+      debugError('Triage-Direct-Failed', e2);
+    }
+
+    toast.error('AI Classifier Unavailable. Using rule-based triage.');
     return ruleBasedFallback(transcript, labels);
   }
 }

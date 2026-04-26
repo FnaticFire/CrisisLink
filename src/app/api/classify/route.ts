@@ -23,13 +23,7 @@ export async function POST(request: NextRequest) {
       model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     }
 
-    const prompt = `You are CrisisLink's emergency triage AI (using Gemini 2.5 Flash-Lite). 
-The following input was converted from Voice/Text and now needs categorization based on safety protocols.
-
-VOICE/TEXT INPUT: "${transcript}"
-IMAGE SCENE LABELS: ${(labels as string[]).join(', ')}
-
-Respond ONLY with a valid JSON object:
+    const prompt = `Classify this emergency and return JSON only:
 {
   "emergencyType": "string",
   "severity": "LOW | MEDIUM | HIGH | CRITICAL",
@@ -38,7 +32,8 @@ Respond ONLY with a valid JSON object:
   "instructions": ["string", "string", "string"]
 }
 
-Be decisive. Prioritize life safety. Return ONLY raw JSON.`;
+User input: "${transcript}"
+Context Labels: ${labels.join(', ')}`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
