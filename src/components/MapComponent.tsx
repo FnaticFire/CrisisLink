@@ -134,7 +134,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
         <>
           <Marker position={trackingPos} icon={typeof window !== 'undefined' ? L.divIcon({
             className: 'responder-marker',
-            html: '<div style="width:30px;height:30px;background:linear-gradient(135deg,#10B981,#059669);border:4px solid white;border-radius:50%;box-shadow:0 4px 12px rgba(16,185,129,0.6);display:flex;align-items:center;justify-content:center;font-size:14px;z-index:1000;">🚗</div>',
+            html: `<div class="w-[30px] h-[30px] bg-gradient-to-br from-emerald-400 to-emerald-600 border-4 border-white rounded-full shadow-xl flex items-center justify-center text-sm z-[1000] ${currentUser?.id === trackingResponderId ? 'pulse-green' : ''}">🚗</div>`,
             iconSize: [30, 30],
           }) : undefined}>
             <Popup>Responder en route</Popup>
@@ -165,6 +165,14 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
           0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
           70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
           100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .pulse-green {
+          animation: pulse-green 2s infinite;
+        }
+        @keyframes pulse-green {
+          0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+          70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
         .leaflet-container {
           background: #111827 !important; /* Dark theme map background */

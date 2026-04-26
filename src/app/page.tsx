@@ -7,7 +7,7 @@ import { useAppStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import EmergencyTrigger from '@/components/EmergencyTrigger';
-import { listenToPendingAlerts, acceptAlert, haversineKm, getEmergencyNumber, createAlert, getMyActiveAlert, getResponderActiveAlert } from '@/lib/alertService';
+import { listenToAlert, listenToPendingAlerts, acceptAlert, haversineKm, getEmergencyNumber, createAlert, getMyActiveAlert, getResponderActiveAlert } from '@/lib/alertService';
 import { db, auth } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
@@ -80,7 +80,10 @@ export default function Home() {
       
       if (foundAlert) {
         setActiveAlert(foundAlert);
-        router.push('/active');
+        // Only redirect of NOT pending
+        if (foundAlert.status !== 'pending') {
+          router.push('/active');
+        }
       }
     };
     restoreSession();
@@ -98,19 +101,25 @@ export default function Home() {
   // Selective Alert Routing
   useEffect(() => {
     if (!currentUser) return;
-    const { role, isVolunteer } = currentUser;
+    const { role, isVolunteer, location } = currentUser;
     
     const filtered = pendingAlerts.filter(a => {
       const type = (a.type || '').toLowerCase();
-      // Role-based routing
-      if (role === 'fire') return type.includes('fire') || type.includes('collapse');
-      if (role === 'hospital') return type.includes('medical') || type.includes('accident') || type.includes('health');
-      if (role === 'police') return !type.includes('volunteer'); // Police see emergency but not volunteer requests
+      const dist = location ? haversineKm(location.lat, location.lng, a.userLocation.lat, a.userLocation.lng) : 999;
       
-      // Volunteer routing
-      if (type.includes('volunteer')) return isVolunteer === true;
+      // Professional role routing (30km radius)
+      if (dist <= 30) {
+        if (role === 'fire' && (type.includes('fire') || type.includes('collapse'))) return true;
+        if (role === 'hospital' && (type.includes('medical') || type.includes('accident') || type.includes('health'))) return true;
+        if (role === 'police' && !type.includes('volunteer')) return true;
+      }
+
+      // Volunteer routing (10km radius + MUST be available)
+      if (isVolunteer && dist <= 10 && type.includes('volunteer')) {
+        return true;
+      }
       
-      return false; // Default: civilians don't see pending alerts here
+      return false;
     });
     setFilteredAlerts(filtered);
   }, [pendingAlerts, currentUser]);
@@ -205,19 +214,28 @@ export default function Home() {
       <main className="flex-1 px-5 pt-2">
         {/* Active Alert Banner */}
         {activeAlert && (
-          <Link href="/active">
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-500 via-rose-500 to-orange-500 p-4 mb-5 card-shadow">
-              <div className="absolute inset-0 shimmer" />
-              <div className="relative flex items-center gap-3">
-                <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm"><ShieldAlert size={22} className="text-white" /></div>
-                <div className="flex-1">
-                  <p className="text-white font-bold text-sm">Active Emergency</p>
-                  <p className="text-white/80 text-xs">{activeAlert.type} • Tap to view</p>
+          <div className="mb-5">
+            <PendingAlertListener />
+            <Link href={activeAlert.status === 'pending' ? '#' : '/active'}>
+              <div className={`relative overflow-hidden rounded-2xl p-4 card-shadow ${activeAlert.status === 'pending' ? 'bg-slate-100 border border-slate-200' : 'bg-gradient-to-r from-red-500 via-rose-500 to-orange-500'}`}>
+                {activeAlert.status !== 'pending' && <div className="absolute inset-0 shimmer" />}
+                <div className="relative flex items-center gap-3">
+                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center backdrop-blur-sm ${activeAlert.status === 'pending' ? 'bg-slate-200 text-slate-400' : 'bg-white/20 text-white'}`}>
+                    <ShieldAlert size={22} />
+                  </div>
+                  <div className="flex-1">
+                    <p className={`font-bold text-sm ${activeAlert.status === 'pending' ? 'text-slate-600' : 'text-white'}`}>
+                      {activeAlert.status === 'pending' ? 'Request Pending' : 'Mission Active'}
+                    </p>
+                    <p className={`text-xs ${activeAlert.status === 'pending' ? 'text-slate-400' : 'text-white/80'}`}>
+                      {activeAlert.type} • {activeAlert.status === 'pending' ? 'Waiting for responder...' : 'Tap for tactical map'}
+                    </p>
+                  </div>
+                  {activeAlert.status !== 'pending' && <ChevronRight size={20} className="text-white/60" />}
                 </div>
-                <ChevronRight size={20} className="text-white/60" />
               </div>
-            </div>
-          </Link>
+            </Link>
+          </div>
         )}
 
         {/* Hero Card — only for civilians */}
@@ -266,9 +284,11 @@ export default function Home() {
         </div>
 
         {/* ── RESPONDER & VOLUNTEER: Incoming Alerts ── */}
-        {(isResponder || currentUser?.isVolunteer) && (
+        {((isResponder) || (isCivilian && currentUser?.isVolunteer)) && (
           <div className="mb-6">
-            <h3 className="text-base font-bold text-slate-800 mb-3">Relevant Alerts ({filteredAlerts.length})</h3>
+            <h3 className="text-base font-bold text-slate-800 mb-3">
+              {isCivilian ? 'Local Help Requests' : 'Relevant Alerts'} ({filteredAlerts.length})
+            </h3>
             {pendingAlerts.length === 0 ? (
               <div className="bg-white rounded-2xl p-8 card-shadow text-center">
                 <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2" />
@@ -444,4 +464,22 @@ export default function Home() {
       )}
     </div>
   );
+}
+
+function PendingAlertListener() {
+  const { activeAlert, setActiveAlert, currentUser } = useAppStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!activeAlert?.id || activeAlert.status !== 'pending') return;
+    const unsub = listenToAlert(activeAlert.id, (updated) => {
+      if (updated && updated.status !== 'pending') {
+        setActiveAlert(updated);
+        router.push('/active');
+      }
+    });
+    return () => unsub();
+  }, [activeAlert?.id, activeAlert?.status, setActiveAlert, router]);
+
+  return null;
 }

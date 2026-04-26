@@ -58,10 +58,12 @@ export default function ActiveEmergencyPage() {
       if (!updated) return;
       setLiveAlert(updated);
       setActiveAlert(updated);
-      if (updated.status === 'accepted' && !responderAccepted) {
-        setResponderAccepted(true);
-        if (isCivilian) toast.success(`🚗 Responder is on the way!`, { duration: 5000 });
+      
+      // Fix Toast Spam: only toast if status JUST became accepted
+      if (updated.status === 'accepted' && updated.responderId && !liveAlert?.responderId) {
+        if (isCivilian) toast.success(`🚗 Responder is on the way!`, { duration: 5000, id: 'responder-toast' });
       }
+
       if (updated.status === 'resolved') {
         resolveAlert();
         toast.success('Emergency resolved.');
@@ -283,7 +285,9 @@ export default function ActiveEmergencyPage() {
         <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between shrink-0 bg-black/30">
           <div className="flex-1 min-w-0">
             <h3 className="text-white font-bold text-sm truncate">{alert.type} Mission</h3>
-            <p className="text-primary text-[10px] font-semibold">{isCivilian ? 'AI Safety Advisor' : `Direct Chat with ${alert.userName}`}</p>
+            <p className="text-primary text-[10px] font-semibold">
+              {isCivilian ? (isHumanChatOpen ? `Direct Chat with ${alert.responderName || 'Responder'}` : 'AI Safety Advisor') : `Direct Chat with ${alert.userName}`}
+            </p>
           </div>
           {isResponder && (
              <a href={`tel:${alert.userPhone || '112'}`} className="mr-3 px-3 py-1.5 bg-green-600/20 text-green-400 rounded-lg text-[10px] font-black border border-green-500/30">
