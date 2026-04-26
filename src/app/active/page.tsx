@@ -131,13 +131,17 @@ export default function ActiveEmergencyPage() {
       });
 
       if (!response.ok) {
-        throw new Error('AI Proxy Unreachable');
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Proxy Error ${response.status}`);
       }
 
       const data = await response.json();
       setAiMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text: data.text || 'Safety guidance updated.' }]);
     } catch (err: any) {
-      toast.error(`AI API Failed: ${err.message}. Showing static guidance.`);
+      const errMsg = err.message || 'Unknown Error';
+      toast.error(`AI Proxy Failed: ${errMsg}`);
+      debugError('AI-Proxy-Failed', err);
+      
       const t = (alert.type || '').toLowerCase();
       let fb = 'Stay in a safe location. Help is on the way.';
       if (t.includes('fire')) fb = 'Stay low below smoke. Find exit.';
