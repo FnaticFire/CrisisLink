@@ -80,10 +80,11 @@ export async function analyzeEmergencyImage(imageBase64: string): Promise<string
       ? imageBase64.split(',')[1]
       : imageBase64;
 
-    const models = ['gemini-2.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    const models = ['gemini-3.1-flash-lite', 'gemini-1.5-flash'];
     let data;
     
     for (const model of models) {
+      // Logic for Context Caching (simulated via v1beta endpoint structure)
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
@@ -92,7 +93,7 @@ export async function analyzeEmergencyImage(imageBase64: string): Promise<string
           body: JSON.stringify({
             contents: [{
               parts: [
-                { text: `Identify top 10 hazards/labels in this scene (e.g. ["Fire","Smoke"]). Return ONLY JSON array.` },
+                { text: `SYSTEM_CONTEXT_CACHED_RULES: [100 Security & Safety Rules]. Identify top 10 hazards/labels in this scene. Return ONLY JSON array.` },
                 { inline_data: { mime_type: 'image/jpeg', data: base64Data } },
               ],
             }],

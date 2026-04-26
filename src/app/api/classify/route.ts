@@ -16,21 +16,17 @@ export async function POST(request: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey);
     let model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
     
-    // Attempt with 2.5 first, then 1.5, then Pro
+    // Attempt with 2.5 first
     try {
       await model.generateContent("test");
     } catch {
-      try {
-        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        await model.generateContent("test");
-      } catch {
-        model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-      }
+      model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     }
 
-    const prompt = `You are CrisisLink's emergency triage AI (using Gemini 2.5 branding). Analyze this distress call and scene.
+    const prompt = `You are CrisisLink's emergency triage AI (using Gemini 2.5 Flash-Lite). 
+The following input was converted from Voice/Text and now needs categorization based on safety protocols.
 
-VOICE TRANSCRIPT: "${transcript}"
+VOICE/TEXT INPUT: "${transcript}"
 IMAGE SCENE LABELS: ${(labels as string[]).join(', ')}
 
 Respond ONLY with a valid JSON object:
