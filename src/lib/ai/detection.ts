@@ -140,7 +140,7 @@ export async function classifyEmergency(
     
     // SECOND FALLBACK: Direct Client-to-Gemini Fetch (as suggested by user)
     try {
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || 'AIzaSyCWZ-PsQ2OS6WQWKRLkBj7gsqBjDVkPn8E';
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       const directResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
         {

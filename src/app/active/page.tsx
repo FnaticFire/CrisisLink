@@ -121,9 +121,9 @@ export default function ActiveEmergencyPage() {
     setAiMessages(prev => [...prev, { sender: 'ai', text: '...' }]);
 
     try {
-      let apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       if (!apiKey || apiKey === 'undefined' || apiKey.length < 10) {
-        apiKey = 'AIzaSyCWZ-PsQ2OS6WQWKRLkBj7gsqBjDVkPn8E';
+        throw new Error('API Key Missing from Environment');
       }
       const genAI = new GoogleGenerativeAI(apiKey);
       

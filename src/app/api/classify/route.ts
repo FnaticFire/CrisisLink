@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const { transcript, labels } = await request.json();
 
-    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || 'AIzaSyCWZ-PsQ2OS6WQWKRLkBj7gsqBjDVkPn8E';
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey || apiKey === 'undefined') {
       return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
     }

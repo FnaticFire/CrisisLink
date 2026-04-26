@@ -3,14 +3,19 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
+const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+if (!apiKey || apiKey === 'undefined' || apiKey.length < 10) {
+  throw new Error('API Key Missing');
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyDb8q9fXdoPaB18s4Pmq-fbsxjs8tSatzg",
-  authDomain: "crisislink-2b499.firebaseapp.com",
-  projectId: "crisislink-2b499",
-  storageBucket: "crisislink-2b499.firebasestorage.app",
-  messagingSenderId: "808682552811",
-  appId: "1:808682552811:web:7182042e4bc5e1d39cedae",
-  measurementId: "G-L7MEVKQQFZ"
+  apiKey: apiKey,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase

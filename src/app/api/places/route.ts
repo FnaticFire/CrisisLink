@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   
   // Ensure api_key is included (prefer server-side env)
   if (!serpParams.get('api_key')) {
-    const key = process.env.NEXT_PUBLIC_SERPAPI_KEY || '6d8c067d5e4922129883526685718a221262d6600c73229b4c09d57a972e2cf6';
+    const key = process.env.NEXT_PUBLIC_SERPAPI_KEY;
     if (!key) {
       return NextResponse.json({ error: 'SerpAPI key not configured' }, { status: 500 });
     }
