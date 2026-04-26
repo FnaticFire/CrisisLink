@@ -36,6 +36,7 @@ export default function LoginPage() {
         if (userDoc.exists()) {
           const userData = userDoc.data() as UserDoc;
           setCurrentUser(userData);
+          localStorage.setItem('crisislink_login_at', Date.now().toString());
           // Restore any active alert
           const activeAlert = await getMyActiveAlert(userData.id);
           if (activeAlert) {
@@ -53,6 +54,7 @@ export default function LoginPage() {
           };
           await setDoc(doc(db, 'users', cred.user.uid), recoveredUser);
           setCurrentUser(recoveredUser);
+          localStorage.setItem('crisislink_login_at', Date.now().toString());
           router.push('/');
         }
       } else {
@@ -78,6 +80,7 @@ export default function LoginPage() {
 
         await setDoc(doc(db, 'users', cred.user.uid), newUser);
         setCurrentUser(newUser);
+        localStorage.setItem('crisislink_login_at', Date.now().toString());
         router.push('/');
         toast.success(`Welcome to CrisisLink, ${username}!`);
       }

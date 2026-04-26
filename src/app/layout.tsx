@@ -4,6 +4,7 @@ import BottomNav from "@/components/BottomNav";
 import { Toaster } from "react-hot-toast";
 import FirebaseInit from "@/components/FirebaseInit";
 import DebugBar from "@/components/DebugBar";
+import SessionGuard from "@/components/SessionGuard";
 
 export const metadata: Metadata = {
   title: "CrisisLink | Emergency Coordination",
@@ -19,6 +20,7 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full" suppressHydrationWarning>
         <FirebaseInit />
+        <SessionGuard />
         <DebugBar />
         <div className="app-container overflow-hidden">
           {children}

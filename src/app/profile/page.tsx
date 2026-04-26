@@ -181,7 +181,14 @@ const ProfilePage = () => {
       {/* Sign Out */}
       <div className="mt-8 px-6">
         <button
-          onClick={async () => { try { await signOut(auth); } catch {} useAppStore.getState().setCurrentUser(null); router.push('/login'); }}
+          onClick={async () => { 
+            try { 
+              localStorage.removeItem('crisislink_login_at');
+              await signOut(auth); 
+            } catch {} 
+            useAppStore.getState().setCurrentUser(null); 
+            router.push('/login'); 
+          }}
           className="w-full flex items-center justify-center gap-3 py-4 bg-red-50 text-primary border border-red-100 rounded-2xl font-bold transition-all hover:bg-primary hover:text-white tap-effect"
         >
           Sign Out
