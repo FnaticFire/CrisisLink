@@ -134,11 +134,12 @@ export default function ActiveEmergencyPage() {
   const respLng = alert.responderLocation?.lng || (alert.userLocation.lng + 0.008);
   const distKm = haversineKm(alert.userLocation.lat, alert.userLocation.lng, respLat, respLng);
   const etaSec = Math.max(0, Math.floor((distKm / 40) * 3600));
-  const canResolve = isResponder && distKm < 0.5;
+  const isAssignedResponder = currentUser?.id === alert.responderId;
+  const canResolve = isAssignedResponder && distKm < 0.5;
   const emergencyDial = getEmergencyNumber(alert.type);
   
   // Contextual Quick Replies
-  const quickReplies = isResponder 
+  const quickReplies = (isResponder || isAssignedResponder)
     ? GET_RESPONDER_QUICK_REPLIES(currentUser?.role, alert.type, formatETA(etaSec))
     : GET_CIVILIAN_QUICK_REPLIES(alert.type);
 
@@ -222,6 +223,8 @@ export default function ActiveEmergencyPage() {
   };
 
 
+  const isCurrentlyResponding = isResponder || isAssignedResponder;
+
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-slate-950 overflow-hidden relative">
       {/* ─── SHARED TOP UI ─── */}
@@ -234,7 +237,7 @@ export default function ActiveEmergencyPage() {
       </a>
 
       {/* MAP SECTION */}
-      <div className={isCivilian ? "h-[42%] w-full relative z-0" : "h-[45%] w-full relative z-0"}>
+      <div className={!isCurrentlyResponding ? "h-[42%] w-full relative z-0" : "h-[45%] w-full relative z-0"}>
         <MapComponent alerts={[alert]} trackingResponderId={alert.responderId} trackingPos={hasResponder ? [respLat, respLng] : undefined} />
         <div className="absolute top-5 right-5 z-10 flex flex-col gap-1.5 pointer-events-none">
           <div className="bg-slate-950/80 backdrop-blur px-3 py-1.5 rounded-xl border border-white/10">
@@ -249,7 +252,7 @@ export default function ActiveEmergencyPage() {
         </div>
 
         {/* Floating card for Civilian (shows search status or responder info) */}
-        {isCivilian && (
+        {!isCurrentlyResponding && (
           <div className="absolute bottom-3 left-3 right-3 z-10 animate-in fade-in slide-in-from-bottom-2">
             {hasResponder ? (
               <div className="bg-slate-950/85 backdrop-blur-xl rounded-2xl p-3 border border-white/10 flex items-center gap-3">
@@ -279,17 +282,17 @@ export default function ActiveEmergencyPage() {
       </div>
 
       {/* ─── BOTTOM SECTION: CIVILIAN (AI GUIDE) VS RESPONDER (DIRECT CHAT) ─── */}
-      <div className={isCivilian ? "h-[58%] w-full bg-[#0F1419] border-t border-white/5 flex flex-col relative z-20" : "h-[55%] w-full bg-[#0F1419] border-t border-white/5 flex flex-col relative z-20"}>
+      <div className={!isCurrentlyResponding ? "h-[58%] w-full bg-[#0F1419] border-t border-white/5 flex flex-col relative z-20" : "h-[55%] w-full bg-[#0F1419] border-t border-white/5 flex flex-col relative z-20"}>
         
         {/* Header */}
         <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between shrink-0 bg-black/30">
           <div className="flex-1 min-w-0">
             <h3 className="text-white font-bold text-sm truncate">{alert.type} Mission</h3>
             <p className="text-primary text-[10px] font-semibold">
-              {isCivilian ? (isHumanChatOpen ? `Direct Chat with ${alert.responderName || 'Responder'}` : 'AI Safety Advisor') : `Direct Chat with ${alert.userName}`}
+              {!isCurrentlyResponding ? (isHumanChatOpen ? `Direct Chat with ${alert.responderName || 'Responder'}` : 'AI Safety Advisor') : `Direct Chat with ${alert.userName}`}
             </p>
           </div>
-          {isResponder && (
+          {isCurrentlyResponding && (
              <a href={`tel:${alert.userPhone || '112'}`} className="mr-3 px-3 py-1.5 bg-green-600/20 text-green-400 rounded-lg text-[10px] font-black border border-green-500/30">
                Call: {alert.userPhone || 'Survivor'}
              </a>
