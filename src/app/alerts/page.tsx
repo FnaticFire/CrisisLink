@@ -2,17 +2,21 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '@/lib/store';
-import { ShieldAlert, CheckCircle2, Clock, MapPin, Loader2 } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, Clock, MapPin, Loader2, HandHelping, Navigation } from 'lucide-react';
 import TopBar from '@/components/TopBar';
 import Link from 'next/link';
-import { listenToPendingAlerts } from '@/lib/alertService';
+import { listenToPendingAlerts, acceptAlert, haversineKm } from '@/lib/alertService';
 import { AlertDoc } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 export default function AlertsPage() {
-  const { activeAlert, currentUser } = useAppStore();
+  const { activeAlert, currentUser, setActiveAlert } = useAppStore();
+  const router = useRouter();
   const [allAlerts, setAllAlerts] = useState<AlertDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accepting, setAccepting] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = listenToPendingAlerts((alerts) => {
@@ -22,8 +26,29 @@ export default function AlertsPage() {
     return () => unsub();
   }, []);
 
+  const isVolunteer = currentUser?.isVolunteer;
+
+  // My alerts
   const myAlerts = allAlerts.filter(a => a.userId === currentUser?.id);
-  const otherAlerts = allAlerts.filter(a => a.userId !== currentUser?.id);
+  // Volunteer requests (for civilian+volunteer users)
+  const volunteerAlerts = allAlerts.filter(a => a.type === 'Volunteer Request' && a.userId !== currentUser?.id);
+  // Other emergency alerts
+  const emergencyAlerts = allAlerts.filter(a => a.type !== 'Volunteer Request' && a.userId !== currentUser?.id);
+
+  const handleAcceptVolunteer = async (alert: AlertDoc) => {
+    if (!currentUser || accepting) return;
+    setAccepting(alert.id);
+    try {
+      await acceptAlert(alert.id, currentUser);
+      setActiveAlert(alert);
+      toast.success('Volunteer request accepted!');
+      router.push('/active');
+    } catch {
+      toast.error('Failed to accept.');
+    } finally {
+      setAccepting(null);
+    }
+  };
 
   return (
     <div className="flex flex-col flex-1 pb-24 overflow-y-auto no-scrollbar">
@@ -51,21 +76,63 @@ export default function AlertsPage() {
           </Link>
         )}
 
-        {/* My Past Alerts */}
+        {/* Volunteer Requests Section (for volunteers) */}
+        {isVolunteer && volunteerAlerts.length > 0 && (
+          <section className="mb-6">
+            <h3 className="text-[11px] font-bold text-violet-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <HandHelping size={13} /> Volunteer Requests
+            </h3>
+            <div className="flex flex-col gap-2.5">
+              {volunteerAlerts.map(a => {
+                const dist = currentUser?.location
+                  ? haversineKm(currentUser.location.lat, currentUser.location.lng, a.userLocation.lat, a.userLocation.lng).toFixed(1)
+                  : '?';
+                const isAccepted = a.status !== 'pending';
+                return (
+                  <div key={a.id} className="bg-white rounded-2xl p-4 card-shadow border-l-4 border-violet-400">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center">
+                        <HandHelping size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">Volunteer Needed</p>
+                        <p className="text-[11px] text-slate-400">{a.userName} • {dist} km away</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 mb-3 bg-slate-50 rounded-lg p-2">{a.reason}</p>
+                    {!isAccepted ? (
+                      <button
+                        onClick={() => handleAcceptVolunteer(a)}
+                        disabled={accepting === a.id}
+                        className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                      >
+                        {accepting === a.id ? <Loader2 size={16} className="animate-spin" /> : <Navigation size={16} />}
+                        {accepting === a.id ? 'Accepting...' : 'Accept & Help'}
+                      </button>
+                    ) : (
+                      <div className="text-center text-xs text-emerald-500 font-semibold py-2">✓ Accepted by {a.responderName}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* My Alerts */}
         <section className="mb-6">
           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">My Alerts</h3>
           {myAlerts.length === 0 && !activeAlert ? (
             <div className="bg-white rounded-2xl p-6 card-shadow text-center">
               <CheckCircle2 size={24} className="text-emerald-400 mx-auto mb-2" />
               <p className="text-sm font-semibold text-slate-400">No alerts raised</p>
-              <p className="text-xs text-slate-300 mt-1">Your alert history will appear here.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">
               {myAlerts.map(a => (
                 <div key={a.id} className="bg-white rounded-2xl p-4 card-shadow flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${a.status === 'resolved' ? 'bg-emerald-500' : 'bg-orange-500'}`}>
-                    {a.status === 'resolved' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${a.type === 'Volunteer Request' ? 'bg-violet-500' : a.status === 'resolved' ? 'bg-emerald-500' : 'bg-orange-500'}`}>
+                    {a.type === 'Volunteer Request' ? <HandHelping size={18} /> : a.status === 'resolved' ? <CheckCircle2 size={18} /> : <Clock size={18} />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-800 truncate">{a.type}</p>
@@ -80,7 +147,7 @@ export default function AlertsPage() {
           )}
         </section>
 
-        {/* Nearby Active Alerts */}
+        {/* Nearby Emergencies */}
         <section className="mb-6">
           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
             <MapPin size={12} /> Nearby Emergencies
@@ -88,16 +155,16 @@ export default function AlertsPage() {
           {loading ? (
             <div className="bg-white rounded-2xl p-6 card-shadow text-center">
               <Loader2 size={20} className="text-primary animate-spin mx-auto mb-2" />
-              <p className="text-xs text-slate-400">Loading nearby alerts...</p>
+              <p className="text-xs text-slate-400">Loading...</p>
             </div>
-          ) : otherAlerts.length === 0 ? (
+          ) : emergencyAlerts.length === 0 ? (
             <div className="bg-white rounded-2xl p-6 card-shadow text-center">
               <CheckCircle2 size={24} className="text-emerald-400 mx-auto mb-2" />
               <p className="text-sm font-semibold text-slate-400">All clear nearby</p>
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">
-              {otherAlerts.map(a => (
+              {emergencyAlerts.map(a => (
                 <div key={a.id} className="bg-white rounded-2xl p-4 card-shadow">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm ${a.severity === 'CRITICAL' ? 'bg-red-500' : a.severity === 'HIGH' ? 'bg-orange-500' : 'bg-yellow-500'}`}>

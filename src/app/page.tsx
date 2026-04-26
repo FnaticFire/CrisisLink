@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ShieldAlert, Users, MapPin, BookOpen, ChevronRight, X, Phone, Zap, Heart, Flame, Droplets, Shield, CheckCircle2, Navigation, Loader2 } from 'lucide-react';
+import { ShieldAlert, Users, MapPin, BookOpen, ChevronRight, X, Phone, Zap, Heart, Flame, Droplets, Shield, CheckCircle2, Navigation, Loader2, HandHelping, Send } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import EmergencyTrigger from '@/components/EmergencyTrigger';
-import { listenToPendingAlerts, acceptAlert, haversineKm, getEmergencyNumber } from '@/lib/alertService';
+import { listenToPendingAlerts, acceptAlert, haversineKm, getEmergencyNumber, createAlert } from '@/lib/alertService';
 import { AlertDoc } from '@/lib/types';
 import { toast } from 'react-hot-toast';
 import { debugLog } from '@/lib/debug';
@@ -33,6 +33,9 @@ export default function Home() {
   const router = useRouter();
   const [showTrigger, setShowTrigger] = useState(false);
   const [showSafetyTips, setShowSafetyTips] = useState(false);
+  const [showVolunteerReq, setShowVolunteerReq] = useState(false);
+  const [volDescription, setVolDescription] = useState('');
+  const [volSending, setVolSending] = useState(false);
   const [selectedTip, setSelectedTip] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [pendingAlerts, setPendingAlerts] = useState<AlertDoc[]>([]);
@@ -70,10 +73,35 @@ export default function Home() {
     }
   };
 
+  const handleVolunteerRequest = async () => {
+    if (!volDescription.trim() || !currentUser) return;
+    setVolSending(true);
+    try {
+      const alertDoc: AlertDoc = {
+        id: 'vol-' + Date.now(),
+        userId: currentUser.id,
+        userName: currentUser.username,
+        type: 'Volunteer Request',
+        severity: 'MEDIUM',
+        status: 'pending',
+        confidence: 100,
+        reason: volDescription.trim(),
+        instructions: ['Volunteer needed nearby', 'Check details and respond if available'],
+        userLocation: currentUser.location ? { lat: currentUser.location.lat, lng: currentUser.location.lng, address: currentUser.location.address } : { lat: 28.6139, lng: 77.2090 },
+        createdAt: Date.now(),
+      };
+      await createAlert(alertDoc);
+      toast.success('Volunteer request posted!');
+      setShowVolunteerReq(false);
+      setVolDescription('');
+    } catch { toast.error('Failed to post request.'); }
+    finally { setVolSending(false); }
+  };
+
   const quickActions = isCivilian ? [
     { label: 'Emergency', icon: ShieldAlert, bg: 'bg-red-50', color: 'text-red-500', ring: 'ring-red-100', action: () => setShowTrigger(true) },
+    { label: 'Volunteer', icon: HandHelping, bg: 'bg-violet-50', color: 'text-violet-500', ring: 'ring-violet-100', action: () => setShowVolunteerReq(true) },
     { label: 'Map', icon: MapPin, bg: 'bg-blue-50', color: 'text-blue-500', ring: 'ring-blue-100', path: '/map' },
-    { label: 'Alerts', icon: Users, bg: 'bg-emerald-50', color: 'text-emerald-500', ring: 'ring-emerald-100', path: '/alerts' },
     { label: 'Safety', icon: BookOpen, bg: 'bg-amber-50', color: 'text-amber-500', ring: 'ring-amber-100', action: () => setShowSafetyTips(true) },
   ] : [
     { label: 'Map', icon: MapPin, bg: 'bg-blue-50', color: 'text-blue-500', ring: 'ring-blue-100', path: '/map' },
@@ -240,6 +268,38 @@ export default function Home() {
                 <p key={i} className="text-sm text-slate-600 mb-1.5"><span className="font-bold text-primary">{i+1}.</span> {t}</p>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Volunteer Request Modal */}
+      {showVolunteerReq && (
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-end p-4">
+          <div className="w-full bg-white rounded-3xl p-6 card-shadow animate-in slide-in-from-bottom-10 duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center">
+                  <HandHelping size={20} />
+                </div>
+                <h2 className="font-bold text-slate-900">Request Volunteer</h2>
+              </div>
+              <button onClick={() => setShowVolunteerReq(false)} className="p-2 bg-slate-100 rounded-xl text-slate-400"><X size={18} /></button>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">Describe what help you need. Nearby volunteers will be notified.</p>
+            <textarea
+              value={volDescription}
+              onChange={(e) => setVolDescription(e.target.value)}
+              placeholder='e.g. "Need help carrying groceries, elderly person at Gate 4"'
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-none h-24 mb-4 transition-all"
+            />
+            <button
+              onClick={handleVolunteerRequest}
+              disabled={!volDescription.trim() || volSending}
+              className="w-full bg-gradient-to-r from-violet-500 to-purple-600 text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-all"
+            >
+              {volSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              {volSending ? 'Posting...' : 'Post Request'}
+            </button>
           </div>
         </div>
       )}

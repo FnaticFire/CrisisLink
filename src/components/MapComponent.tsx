@@ -23,12 +23,17 @@ const userIcon = typeof window !== 'undefined' ? L.divIcon({
   iconSize: [24, 24],
 }) : undefined;
 
-const getEmergencyIcon = (severity: string) => {
+const getEmergencyIcon = (severity: string, type: string) => {
   if (typeof window === 'undefined') return undefined;
-  const color = severity === 'CRITICAL' ? 'bg-red-600' : severity === 'HIGH' ? 'bg-red-400' : severity === 'MEDIUM' ? 'bg-yellow-400' : 'bg-blue-400';
+  const isVolunteer = type === 'Volunteer Request';
+  const color = isVolunteer ? 'bg-violet-600' :
+                severity === 'CRITICAL' ? 'bg-red-600' : 
+                severity === 'HIGH' ? 'bg-red-400' : 
+                severity === 'MEDIUM' ? 'bg-yellow-400' : 'bg-blue-400';
+  const emoji = isVolunteer ? '🙋' : '🚨';
   return L.divIcon({
     className: 'emergency-marker',
-    html: `<div class="w-8 h-8 ${color} border-4 border-white rounded-full shadow-xl flex items-center justify-center text-white animate-bounce text-sm">🚨</div>`,
+    html: `<div class="w-8 h-8 ${color} border-4 border-white rounded-full shadow-xl flex items-center justify-center text-white animate-bounce text-sm">${emoji}</div>`,
     iconSize: [32, 32],
   });
 };
@@ -87,20 +92,28 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
       )}
 
       {/* Active Alerts from Firestore */}
-      {alerts.map(alert => (
-        <Marker 
-          key={alert.id} 
-          position={[alert.userLocation.lat, alert.userLocation.lng]} 
-          icon={getEmergencyIcon(alert.severity)}
-        >
-          <Popup>
-            <div className="font-bold flex items-center gap-1">
-              <span className="capitalize">{alert.type}</span>
-            </div>
-            <div className="text-[10px] font-black uppercase tracking-wider text-gray-500">{alert.severity} Priority</div>
-          </Popup>
-        </Marker>
-      ))}
+      {alerts.map(alert => {
+        // Volunteers see volunteer requests + emergencies. Responders see emergencies.
+        const isVolunteerRequest = alert.type === 'Volunteer Request';
+        if (isVolunteerRequest && !currentUser?.isVolunteer) return null;
+        
+        return (
+          <Marker 
+            key={alert.id} 
+            position={[alert.userLocation.lat, alert.userLocation.lng]} 
+            icon={getEmergencyIcon(alert.severity, alert.type)}
+          >
+            <Popup>
+              <div className="font-bold flex items-center gap-1">
+                <span className="capitalize">{alert.type}</span>
+              </div>
+              <div className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                {isVolunteerRequest ? 'Community Help Needed' : `${alert.severity} Priority`}
+              </div>
+            </Popup>
+          </Marker>
+        );
+      })}
 
       {/* Recommended places (if needed) */}
       {nearbyPlaces.map(place => (
