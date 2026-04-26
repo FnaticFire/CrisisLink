@@ -49,6 +49,27 @@ export async function getMyActiveAlert(userId: string): Promise<AlertDoc | null>
   }
 }
 
+// ─── Get active mission for a responder ───
+export async function getResponderActiveAlert(responderId: string): Promise<AlertDoc | null> {
+  try {
+    const q = query(
+      collection(db, ALERTS_COL),
+      where('responderId', '==', responderId),
+      where('status', 'in', ['accepted', 'en_route'])
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const alerts = snap.docs.map(d => d.data() as AlertDoc);
+      alerts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return alerts[0];
+    }
+    return null;
+  } catch (err) {
+    debugError('Firestore', 'getResponderActiveAlert failed:', err);
+    return null;
+  }
+}
+
 // ─── Real-time listener for ALL non-resolved alerts ───
 // NO orderBy — avoids composite index requirement. Sort client-side.
 export function listenToPendingAlerts(callback: (alerts: AlertDoc[]) => void): Unsubscribe {

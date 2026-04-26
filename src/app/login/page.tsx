@@ -9,7 +9,7 @@ import { Role, UserDoc } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { getMyActiveAlert } from '@/lib/alertService';
+import { getMyActiveAlert, getResponderActiveAlert } from '@/lib/alertService';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -37,12 +37,18 @@ export default function LoginPage() {
           const userData = userDoc.data() as UserDoc;
           setCurrentUser(userData);
           localStorage.setItem('crisislink_login_at', Date.now().toString());
-          // Restore any active alert
-          const activeAlert = await getMyActiveAlert(userData.id);
+          
+          // Restore any active alert / mission
+          const activeAlert = (userData.role === 'civilian') 
+            ? await getMyActiveAlert(userData.id)
+            : await getResponderActiveAlert(userData.id);
+
           if (activeAlert) {
             setActiveAlert(activeAlert);
+            router.push('/active');
+          } else {
+            router.push('/');
           }
-          router.push('/');
         } else {
           const recoveredUser: UserDoc = {
             id: cred.user.uid,

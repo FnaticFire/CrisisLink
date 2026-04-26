@@ -7,8 +7,8 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'react-hot-toast';
 
-// 2 hours session limit
-const SESSION_DURATION_MS = 2 * 60 * 60 * 1000; 
+// 10 minutes session limit
+const SESSION_DURATION_MS = 10 * 60 * 1000; 
 
 export default function SessionGuard() {
   const router = useRouter();
