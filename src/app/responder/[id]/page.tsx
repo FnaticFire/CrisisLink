@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { ChevronLeft, Star, Shield, Clock, MapPin, Award, MessageCircle, Phone } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'react-hot-toast';
+import { createAlert } from '@/lib/alertService';
 
 // Per-responder specialties
 const SPECIALTIES: Record<string, string[]> = {
@@ -79,35 +80,61 @@ const ResponderProfile = () => {
         success: `🚨 Emergency alert sent to ${responder.name}!`,
         error: 'Failed to send alert.',
       }
-    ).then(() => {
-      setActiveAlert({
+    ).then(async () => {
+      const alertDoc: any = {
         id: 'alert-' + Date.now(),
         userId: currentUser?.id || 'user-1',
+        userName: currentUser?.username || 'Civilian',
         responderId: responder.id,
+        responderName: responder.name,
+        responderRole: badge,
+        responderPhone: responder.phone || '+91 98765 43210',
         type: 'emergency',
         status: 'dispatched',
         severity: 'high',
-        location: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
-        createdAt: new Date().toISOString(),
-      });
-      router.push('/map');
+        confidence: 100,
+        reason: 'Manual responder dispatch',
+        instructions: ['Responder contacted directly', 'Stay at location'],
+        userLocation: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
+        createdAt: Date.now(),
+      };
+      try {
+        await createAlert(alertDoc);
+        setActiveAlert(alertDoc);
+        router.push('/active');
+      } catch {
+        toast.error('Failed to create alert document');
+      }
     });
   };
 
-  const handleChat = () => {
-    if (!useAppStore.getState().activeAlert) {
-      setActiveAlert({
-        id: 'alert-chat-' + Date.now(),
-        userId: currentUser?.id || 'user-1',
-        responderId: responder.id,
-        type: 'General Inquiry',
-        status: 'active',
-        severity: 'low',
-        location: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
-        createdAt: new Date().toISOString(),
-      });
+  const handleChat = async () => {
+    const alertId = 'chat-' + (currentUser?.id || 'anon') + '-' + responder.id;
+    const inquiryAlert: any = {
+      id: alertId,
+      userId: currentUser?.id || 'user-1',
+      userName: currentUser?.username || 'User',
+      responderId: responder.id,
+      responderName: responder.name,
+      responderRole: badge,
+      responderPhone: responder.phone || '+91 98765 43210',
+      type: 'General Inquiry',
+      status: 'accepted',
+      severity: 'low',
+      confidence: 100,
+      reason: 'General inquiry started from profile',
+      instructions: ['Chatting with responder'],
+      userLocation: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'New Delhi' },
+      createdAt: Date.now(),
+    };
+    
+    try {
+      await createAlert(inquiryAlert);
+      setActiveAlert(inquiryAlert);
+      router.push('/active');
+    } catch {
+      toast.error('Could not start chat session');
     }
-    router.push('/chat');
   };
 
   return (

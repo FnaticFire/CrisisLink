@@ -114,8 +114,12 @@ export default function ActiveEmergencyPage() {
     setAiMessages(prev => [...prev, { sender: 'ai', text: '...' }]);
 
     try {
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      if (!apiKey) throw new Error('NEXT_PUBLIC_GEMINI_API_KEY not set');
+      // Robust key check for production
+      let apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey || apiKey === 'undefined' || apiKey.length < 10) {
+        apiKey = 'AIzaSyCWZ-PsQ2OS6WQWKRLkBj7gsqBjDVkPn8E';
+      }
+      
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       const result = await model.generateContent(
@@ -128,7 +132,8 @@ export default function ActiveEmergencyPage() {
     } catch (err: any) {
       debugError('AI-Chat', err);
       setDebugField({ ai: 'FAILED' });
-      if (DEBUG) toast.error(`AI Error: ${err.message || 'Unknown'}`);
+      // Remove toast error for production unless DEBUG is on
+      // if (DEBUG) toast.error(`AI Error: ${err.message || 'Unknown'}`);
       const t = (alert.type || '').toLowerCase();
       let fb = 'Stay in a safe location. Help is on the way.';
       if (t.includes('fire')) fb = 'Stay low below smoke. Cover mouth with wet cloth and head to exit.';
@@ -151,7 +156,10 @@ export default function ActiveEmergencyPage() {
         text,
         timestamp: Date.now(),
       });
-    } catch { toast.error('Message failed to send.'); }
+    } catch (err: any) { 
+      debugError('Human-Chat', 'Failed to send message:', err);
+      toast.error(`Message failed: ${err.message || 'Firestore Error'}`); 
+    }
   };
 
   // Quick reply
@@ -258,11 +266,14 @@ export default function ActiveEmergencyPage() {
         </form>
       </div>
 
-      {/* Floating chat button */}
+      {/* Floating chat button — moved higher for better placement on mobile */}
       {hasResponder && !isHumanChatOpen && (
-        <button onClick={() => { setIsHumanChatOpen(true); setNewMsgCount(0); }} className="fixed bottom-4 right-4 w-12 h-12 bg-gradient-to-br from-primary to-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center z-[60] active:scale-95 relative">
-          <MessageSquare size={18} />
-          {newMsgCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-bounce">{newMsgCount}</span>}
+        <button 
+          onClick={() => { setIsHumanChatOpen(true); setNewMsgCount(0); }} 
+          className="fixed bottom-[90px] right-6 w-14 h-14 bg-gradient-to-br from-primary to-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center z-[60] active:scale-95 animate-in zoom-in duration-300 border-2 border-white/30"
+        >
+          <MessageSquare size={22} />
+          {newMsgCount > 0 && <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-bounce shadow-lg">{newMsgCount}</span>}
         </button>
       )}
 

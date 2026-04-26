@@ -3,7 +3,7 @@
 // Set DEBUG = false for clean hackathon demo
 // ============================================================
 
-export const DEBUG = true;
+export const DEBUG = false;
 
 export type ServiceStatus = 'ACTIVE' | 'FAILED' | 'PENDING';
 
