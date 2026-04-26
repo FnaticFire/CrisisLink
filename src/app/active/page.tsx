@@ -25,12 +25,16 @@ export default function ActiveEmergencyPage() {
   const [humanChatInput, setHumanChatInput] = useState('');
   const [responderAccepted, setResponderAccepted] = useState(false);
   const [newMsgCount, setNewMsgCount] = useState(0);
+  const [lastHumanMsg, setLastHumanMsg] = useState<string | null>(null);
+  const [showMsgPreview, setShowMsgPreview] = useState(false);
   const aiChatEndRef = useRef<HTMLDivElement>(null);
   const humanChatEndRef = useRef<HTMLDivElement>(null);
 
   const alert = liveAlert || activeAlert;
   const isCivilian = currentUser?.role === 'civilian';
   const isResponder = !isCivilian;
+  const isAssignedResponder = currentUser?.id === alert?.responderId;
+  const isCurrentlyResponding = isResponder || isAssignedResponder;
 
   // Real-time Firestore sync
   useEffect(() => {
@@ -61,7 +65,7 @@ export default function ActiveEmergencyPage() {
       
       // Fix Toast Spam: only toast if status JUST became accepted
       if (updated.status === 'accepted' && updated.responderId && !liveAlert?.responderId) {
-        if (isCivilian) toast.success(`🚗 Responder is on the way!`, { duration: 5000, id: 'responder-toast' });
+        if (!isCurrentlyResponding) toast.success(`🚗 Responder is on the way!`, { duration: 5000, id: 'responder-toast' });
       }
 
       if (updated.status === 'resolved') {
@@ -79,13 +83,20 @@ export default function ActiveEmergencyPage() {
     if (!activeAlert?.id) return;
     const unsub = listenToChat(activeAlert.id, (msgs) => {
       setHumanMessages(msgs);
-      if (isCivilian && !isHumanChatOpen && msgs.length > 0) {
-        setNewMsgCount(prev => prev + 1);
+      if (!isCurrentlyResponding && !isHumanChatOpen && msgs.length > 0) {
+        const last = msgs[msgs.length - 1];
+        if (last.senderId !== currentUser?.id) {
+          setNewMsgCount(prev => prev + 1);
+          setLastHumanMsg(last.text);
+          setShowMsgPreview(true);
+          // Auto hide preview after 4 seconds
+          setTimeout(() => setShowMsgPreview(false), 4000);
+        }
       }
     });
     return () => unsub();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAlert?.id]);
+  }, [activeAlert?.id, isHumanChatOpen, isCurrentlyResponding]);
 
   // ── LIVE GPS TRACKING ──
   useEffect(() => {
@@ -134,7 +145,6 @@ export default function ActiveEmergencyPage() {
   const respLng = alert.responderLocation?.lng || (alert.userLocation.lng + 0.008);
   const distKm = haversineKm(alert.userLocation.lat, alert.userLocation.lng, respLat, respLng);
   const etaSec = Math.max(0, Math.floor((distKm / 40) * 3600));
-  const isAssignedResponder = currentUser?.id === alert.responderId;
   const canResolve = isAssignedResponder && distKm < 0.5;
   const emergencyDial = getEmergencyNumber(alert.type);
   
@@ -223,7 +233,6 @@ export default function ActiveEmergencyPage() {
   };
 
 
-  const isCurrentlyResponding = isResponder || isAssignedResponder;
 
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-slate-950 overflow-hidden relative">
@@ -363,14 +372,26 @@ export default function ActiveEmergencyPage() {
       {/* ─── MODALS & OVERLAYS ─── */}
 
       {/* Civilian's Floating Chat Bubble (Opens Human Chat Modal) */}
-      {isCivilian && hasResponder && !isHumanChatOpen && (
-        <button 
-          onClick={() => { setIsHumanChatOpen(true); setNewMsgCount(0); }} 
-          className="fixed bottom-[90px] right-6 w-14 h-14 bg-gradient-to-br from-primary to-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center z-[60] active:scale-95 animate-in zoom-in duration-300 border-2 border-white/30"
-        >
-          <MessageSquare size={22} />
-          {newMsgCount > 0 && <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-bounce shadow-lg">{newMsgCount}</span>}
-        </button>
+      {!isCurrentlyResponding && hasResponder && !isHumanChatOpen && (
+        <>
+          {/* Message Preview Bubble */}
+          {showMsgPreview && lastHumanMsg && (
+            <div className="fixed bottom-32 right-6 max-w-[220px] bg-white text-slate-900 px-4 py-3 rounded-3xl rounded-br-none shadow-2xl z-[61] border border-slate-100 flex items-start gap-2 animate-in fade-in zoom-in slide-in-from-bottom-5 duration-300">
+               <div className="flex-1 min-w-0">
+                 <p className="text-[9px] font-black text-primary uppercase tracking-[0.15em] mb-1">Message from Responder</p>
+                 <p className="text-[11px] font-bold text-slate-800 line-clamp-2 leading-snug">{lastHumanMsg}</p>
+               </div>
+            </div>
+          )}
+          
+          <button 
+            onClick={() => { setIsHumanChatOpen(true); setNewMsgCount(0); setShowMsgPreview(false); }} 
+            className="fixed bottom-[90px] right-6 w-14 h-14 bg-gradient-to-br from-primary to-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center z-[60] active:scale-95 animate-in zoom-in duration-300 border-2 border-white/30"
+          >
+            <MessageSquare size={22} />
+            {newMsgCount > 0 && <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-bounce shadow-lg">{newMsgCount}</span>}
+          </button>
+        </>
       )}
 
       {/* Civilian's Human Chat Modal */}
