@@ -126,19 +126,20 @@ export default function ActiveEmergencyPage() {
         apiKey = 'AIzaSyCWZ-PsQ2OS6WQWKRLkBj7gsqBjDVkPn8E';
       }
       const genAI = new GoogleGenerativeAI(apiKey);
+      // Explicitly using the string "gemini-2.5-flash-lite" as requested.
+      // If this throws an error, the catch block will alert the user.
       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
       const result = await model.generateContent(
-        `You are CrisisLink AI (using Gemini 2.5 Flash-Lite), an emergency safety advisor. The user is in an active "${alert.type}" emergency (severity: ${alert.severity}). They say: "${msg}". Respond with 1-2 sentences of actionable, specific safety advice.`
+        `You are CrisisLink AI (Gemini 2.5), an emergency safety advisor. Emergency: ${alert.type}. User: ${msg}`
       );
       const text = result.response.text();
-      setDebugField({ ai: 'ACTIVE' });
       setAiMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text }]);
     } catch (err: any) {
-      setDebugField({ ai: 'FAILED' });
+      toast.error(`Gemini 2.5 API Failed: ${err.message}. Showing fallback guidance.`, { duration: 6000 });
       const t = (alert.type || '').toLowerCase();
       let fb = 'Stay in a safe location. Help is on the way.';
-      if (t.includes('fire')) fb = 'Stay low below smoke. Cover mouth with wet cloth and head to exit.';
-      else if (t.includes('medical')) fb = 'Keep patient still. Do not give food or water. Monitor breathing.';
+      if (t.includes('fire')) fb = 'Stay low below smoke. Find exit.';
+      else if (t.includes('medical')) fb = 'Keep patient still. Monitor breathing.';
       setAiMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text: fb }]);
     }
   };
@@ -213,9 +214,11 @@ export default function ActiveEmergencyPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-bold text-xs truncate">{alert.responderName}</p>
-                  <p className="text-white/50 text-[10px]">{alert.responderRole} • {alert.responderPhone}</p>
+                  <p className="text-white/50 text-[10px]">{alert.responderRole}</p>
                 </div>
-                <a href={`tel:${alert.responderPhone}`} className="w-9 h-9 bg-green-600/20 text-green-400 rounded-lg flex items-center justify-center shrink-0"><Phone size={14} /></a>
+                <a href={`tel:${alert.responderPhone}`} className="px-4 py-2 bg-green-600/20 text-green-400 rounded-xl text-xs font-black ring-1 ring-green-500/30 tap-effect">
+                  {alert.responderPhone || '+91 108'}
+                </a>
                 <button onClick={() => { setIsHumanChatOpen(true); setNewMsgCount(0); }} className="w-9 h-9 bg-blue-600/20 text-blue-400 rounded-lg flex items-center justify-center relative shrink-0">
                   <MessageSquare size={14} />
                   {newMsgCount > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{newMsgCount}</span>}
@@ -236,10 +239,15 @@ export default function ActiveEmergencyPage() {
         
         {/* Header */}
         <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between shrink-0 bg-black/30">
-          <div>
-            <h3 className="text-white font-bold text-sm">{alert.type} Mission</h3>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white font-bold text-sm truncate">{alert.type} Mission</h3>
             <p className="text-primary text-[10px] font-semibold">{isCivilian ? 'AI Safety Advisor' : `Direct Chat with ${alert.userName}`}</p>
           </div>
+          {isResponder && (
+             <a href={`tel:${alert.userPhone || '112'}`} className="mr-3 px-3 py-1.5 bg-green-600/20 text-green-400 rounded-lg text-[10px] font-black border border-green-500/30">
+               Call: {alert.userPhone || 'Survivor'}
+             </a>
+          )}
           {canResolve && (
             <button onClick={handleResolve} className="bg-green-600 text-white font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 active:scale-95 shadow-lg shadow-green-900/20">
               <CheckCircle2 size={13} /> Resolve Alert

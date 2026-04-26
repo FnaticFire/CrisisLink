@@ -15,6 +15,7 @@ interface AppState {
   responders: Array<any>;
 
   setCurrentUser: (user: UserDoc | null) => void;
+  updateUser: (updates: Partial<UserDoc>) => void;
   setCurrentLocation: (loc: { lat: number; lng: number, address?: string } | null) => void;
   setActiveAlertId: (id: string | null) => void;
   setActiveAlert: (alert: any) => void;
@@ -42,6 +43,9 @@ export const useAppStore = create<AppState>((set) => ({
   responders: [],
 
   setCurrentUser: (user) => set({ currentUser: user }),
+  updateUser: (updates) => set((state) => ({ 
+    currentUser: state.currentUser ? { ...state.currentUser, ...updates } : null 
+  })),
   setCurrentLocation: (loc) => set({ currentLocation: loc }),
   setActiveAlertId: (id) => set({ activeAlertId: id }),
   setActiveAlert: (alert) => set({ activeAlert: alert }),

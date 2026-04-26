@@ -8,6 +8,9 @@ import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import EmergencyTrigger from '@/components/EmergencyTrigger';
 import { listenToPendingAlerts, acceptAlert, haversineKm, getEmergencyNumber, createAlert, getMyActiveAlert, getResponderActiveAlert } from '@/lib/alertService';
+import { db, auth } from '@/lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+
 import { AlertDoc } from '@/lib/types';
 import { toast } from 'react-hot-toast';
 import { debugLog } from '@/lib/debug';
@@ -39,7 +42,11 @@ export default function Home() {
   const [selectedTip, setSelectedTip] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [pendingAlerts, setPendingAlerts] = useState<AlertDoc[]>([]);
+  const [filteredAlerts, setFilteredAlerts] = useState<AlertDoc[]>([]);
   const [accepting, setAccepting] = useState<string | null>(null);
+  const [showPhoneUpdate, setShowPhoneUpdate] = useState(false);
+  const [newPhone, setNewPhone] = useState('');
+  const [updatingPhone, setUpdatingPhone] = useState(false);
 
   const isCivilian = currentUser?.role === 'civilian';
   const isResponder = !isCivilian;
@@ -72,11 +79,59 @@ export default function Home() {
   useEffect(() => {
     if (!isResponder || !currentUser) return;
     const unsub = listenToPendingAlerts((alerts) => {
-      debugLog('Responder', `${alerts.length} active alerts`);
       setPendingAlerts(alerts);
     });
     return () => unsub();
   }, [isResponder, currentUser]);
+
+  // Selective Alert Routing
+  useEffect(() => {
+    if (!currentUser) return;
+    const { role, isVolunteer } = currentUser;
+    
+    const filtered = pendingAlerts.filter(a => {
+      const type = (a.type || '').toLowerCase();
+      // Role-based routing
+      if (role === 'fire') return type.includes('fire') || type.includes('collapse');
+      if (role === 'hospital') return type.includes('medical') || type.includes('accident') || type.includes('health');
+      if (role === 'police') return !type.includes('volunteer'); // Police see emergency but not volunteer requests
+      
+      // Volunteer routing
+      if (type.includes('volunteer')) return isVolunteer === true;
+      
+      return false; // Default: civilians don't see pending alerts here
+    });
+    setFilteredAlerts(filtered);
+  }, [pendingAlerts, currentUser]);
+
+  // Phone Verification
+  useEffect(() => {
+    if (currentUser && !currentUser.phone) {
+      setShowPhoneUpdate(true);
+    }
+  }, [currentUser]);
+
+  const handleUpdatePhone = async () => {
+    if (!newPhone.trim() || !currentUser) return;
+    setUpdatingPhone(true);
+    try {
+      await updateDoc(doc(db, 'users', currentUser.id), { phone: newPhone.trim() });
+      useAppStore.getState().updateUser({ phone: newPhone.trim() });
+      toast.success('Mobile number updated!');
+      setShowPhoneUpdate(false);
+    } catch { toast.error('Failed to update.'); }
+    finally { setUpdatingPhone(false); }
+  };
+
+  const toggleVolunteer = async () => {
+    if (!currentUser) return;
+    const next = !currentUser.isVolunteer;
+    try {
+      await updateDoc(doc(db, 'users', currentUser.id), { isVolunteer: next });
+      useAppStore.getState().updateUser({ isVolunteer: next });
+      toast.success(next ? 'You are now available for volunteer duty!' : 'Volunteer status disabled.');
+    } catch { toast.error('Failed to toggle status.'); }
+  };
 
   const handleAcceptAlert = async (alert: AlertDoc) => {
     if (!currentUser || accepting) return;
@@ -107,7 +162,10 @@ export default function Home() {
         confidence: 100,
         reason: volDescription.trim(),
         instructions: ['Volunteer needed nearby', 'Check details and respond if available'],
-        userLocation: currentUser.location ? { lat: currentUser.location.lat, lng: currentUser.location.lng, address: currentUser.location.address } : { lat: 28.6139, lng: 77.2090 },
+        userLocation: currentUser?.location
+        ? { lat: currentUser.location.lat, lng: currentUser.location.lng, address: currentUser.location.address }
+        : { lat: 28.6139, lng: 77.2090, address: 'Unknown' },
+        userPhone: currentUser?.phone || '',
         createdAt: Date.now(),
       };
       await createAlert(alertDoc);
@@ -196,10 +254,10 @@ export default function Home() {
           })}
         </div>
 
-        {/* ── RESPONDER: Incoming Alerts ── */}
-        {isResponder && (
+        {/* ── RESPONDER & VOLUNTEER: Incoming Alerts ── */}
+        {(isResponder || currentUser?.isVolunteer) && (
           <div className="mb-6">
-            <h3 className="text-base font-bold text-slate-800 mb-3">Incoming Alerts ({pendingAlerts.length})</h3>
+            <h3 className="text-base font-bold text-slate-800 mb-3">Relevant Alerts ({filteredAlerts.length})</h3>
             {pendingAlerts.length === 0 ? (
               <div className="bg-white rounded-2xl p-8 card-shadow text-center">
                 <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2" />
@@ -208,7 +266,7 @@ export default function Home() {
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {pendingAlerts.map((a) => {
+                {filteredAlerts.map((a) => {
                   const dial = getEmergencyNumber(a.type);
                   const dist = currentUser?.location
                     ? haversineKm(currentUser.location.lat, currentUser.location.lng, a.userLocation.lat, a.userLocation.lng).toFixed(1)
@@ -319,6 +377,56 @@ export default function Home() {
             >
               {volSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               {volSending ? 'Posting...' : 'Post Request'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Volunteer Toggle for Civilians */}
+      {isCivilian && (
+        <div className="px-5 mb-6">
+          <button 
+            onClick={toggleVolunteer}
+            className={`w-full py-4 rounded-2xl border-2 flex items-center justify-between px-6 transition-all ${currentUser?.isVolunteer ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${currentUser?.isVolunteer ? 'bg-violet-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                <HandHelping size={20} />
+              </div>
+              <div className="text-left">
+                <p className="font-bold text-sm">Volunteer Status</p>
+                <p className="text-[10px] opacity-70">{currentUser?.isVolunteer ? 'Available to help others' : 'Currently offline'}</p>
+              </div>
+            </div>
+            <div className={`w-12 h-6 rounded-full relative transition-colors ${currentUser?.isVolunteer ? 'bg-violet-500' : 'bg-slate-200'}`}>
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${currentUser?.isVolunteer ? 'right-1' : 'left-1'}`} />
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* Force Phone Update Modal */}
+      {showPhoneUpdate && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-6">
+          <div className="w-full max-w-sm bg-white rounded-[32px] p-8 card-shadow border border-slate-100 text-center animate-in zoom-in-95 duration-300">
+            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Phone size={32} />
+            </div>
+            <h2 className="text-xl font-black text-slate-900 mb-2">Complete Your Profile</h2>
+            <p className="text-sm text-slate-400 mb-6 leading-relaxed">Please provide your mobile number so responders can reach you in case of emergency.</p>
+            <input 
+              type="tel"
+              value={newPhone}
+              onChange={e => setNewPhone(e.target.value)}
+              placeholder="+91 XXXXX XXXXX"
+              className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-center text-lg font-bold outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 mb-6"
+            />
+            <button 
+              onClick={handleUpdatePhone}
+              disabled={!newPhone.trim() || updatingPhone}
+              className="w-full bg-primary text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 transition-all"
+            >
+              {updatingPhone ? <Loader2 className="animate-spin" /> : 'Continue'}
             </button>
           </div>
         </div>

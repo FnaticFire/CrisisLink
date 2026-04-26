@@ -24,6 +24,7 @@ export interface AlertDoc {
   id: string;
   userId: string;
   userName: string;
+  userPhone?: string;
   userLocation: { lat: number; lng: number; address?: string };
   type: string;
   severity: string;
