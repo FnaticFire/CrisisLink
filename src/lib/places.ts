@@ -134,50 +134,32 @@ export async function findAllEmergencyServices(lat: number, lng: number): Promis
 }
 
 // ─────────────────────────────────────────────
-// Realistic Indian Mock Data (Delhi-centered)
+// Dynamic Mock Data (Falls back smoothly if API key missing)
 // ─────────────────────────────────────────────
 function getMockPlaces(type: NearbyPlace['type'], lat: number, lng: number): NearbyPlace[] {
-  const offset = () => (Math.random() - 0.5) * 0.05;
-
-  const mocks: Record<NearbyPlace['type'], NearbyPlace[]> = {
-    hospital: [
-      {
-        id: 'h1', name: 'AIIMS Trauma Centre', type: 'hospital',
-        address: 'Ansari Nagar, New Delhi', distance: '1.2 km',
-        rating: 4.8, phone: '011-26588500', lat: lat + offset(), lng: lng + offset(), openNow: true,
-      },
-      {
-        id: 'h2', name: 'Ram Manohar Lohia Hospital', type: 'hospital',
-        address: 'Baba Kharak Singh Marg, New Delhi', distance: '2.1 km',
-        rating: 4.5, phone: '011-23404323', lat: lat + offset(), lng: lng + offset(), openNow: true,
-      },
-      {
-        id: 'h3', name: 'Safdarjung Hospital', type: 'hospital',
-        address: 'Ring Road, New Delhi', distance: '3.0 km',
-        rating: 4.3, phone: '011-26707444', lat: lat + offset(), lng: lng + offset(), openNow: true,
-      },
-    ],
-    police: [
-      {
-        id: 'p1', name: 'Connaught Place Police Station', type: 'police',
-        address: 'Connaught Place, New Delhi', distance: '0.5 km',
-        rating: 4.2, phone: '011-23417280', lat: lat + offset(), lng: lng + offset(), openNow: true,
-      },
-      {
-        id: 'p2', name: 'Parliament Street Police Station', type: 'police',
-        address: 'Parliament Street, New Delhi', distance: '1.8 km',
-        rating: 4.4, lat: lat + offset(), lng: lng + offset(), openNow: true,
-      },
-    ],
-    fire: [
-      {
-        id: 'f1', name: 'Delhi Fire Station — CP', type: 'fire',
-        address: 'Kasturba Gandhi Marg, New Delhi', distance: '1.1 km',
-        rating: 4.6, phone: '101', lat: lat + offset(), lng: lng + offset(), openNow: true,
-      },
-    ],
-    pharmacy: [],
+  const titles: Record<NearbyPlace['type'], string[]> = {
+    hospital: ['City Medical Center', 'Apex Multi-specialty', 'Holy Spirit Clinic'],
+    police: ['District Police Sub-station', 'Public Safety Point', 'City Guardian Force'],
+    fire: ['Zone A Fire Brigade', 'Central Rescue Unit'],
+    pharmacy: ['24/7 MedStore', 'Community Wellness Pharmacy']
   };
 
-  return mocks[type] || [];
+  const selectedTitles = titles[type] || ['Emergency Help Center'];
+  
+  return selectedTitles.map((title, i) => {
+    const latOff = (Math.random() - 0.5) * 0.02; // ~2km
+    const lngOff = (Math.random() - 0.5) * 0.02;
+    return {
+      id: `mock-${type}-${i}`,
+      name: `${title} (ESTIMATED)`,
+      type,
+      address: `Nearby ${type} service area.`,
+      distance: `${(Math.random() * 2 + 0.5).toFixed(1)} km`,
+      rating: 4.0 + Math.random(),
+      phone: '112',
+      lat: lat + latOff,
+      lng: lng + lngOff,
+      openNow: true,
+    };
+  });
 }
