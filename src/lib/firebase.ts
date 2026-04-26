@@ -4,8 +4,8 @@ import { getFirestore } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-if (!apiKey || apiKey === 'undefined' || apiKey.length < 10) {
-  throw new Error('API Key Missing');
+if (!apiKey && typeof window !== 'undefined') {
+  console.warn('Firebase API Key missing! Check environment variables.');
 }
 
 const firebaseConfig = {

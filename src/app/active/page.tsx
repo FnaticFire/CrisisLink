@@ -123,7 +123,14 @@ export default function ActiveEmergencyPage() {
     try {
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       if (!apiKey || apiKey === 'undefined' || apiKey.length < 10) {
-        throw new Error('API Key Missing from Environment');
+        // Handle missing key gracefully in UI
+        const t = (alert.type || '').toLowerCase();
+        let fb = 'Stay in a safe location. Help is on the way.';
+        if (t.includes('fire')) fb = 'Stay low below smoke. Find exit.';
+        else if (t.includes('medical')) fb = 'Keep patient still. Monitor breathing.';
+        setAiMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text: fb }]);
+        toast.error('AI Safety Guide unavailable (API Key missing)');
+        return;
       }
       const genAI = new GoogleGenerativeAI(apiKey);
       
