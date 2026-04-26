@@ -7,7 +7,7 @@ import { useAppStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import EmergencyTrigger from '@/components/EmergencyTrigger';
-import { listenToPendingAlerts, acceptAlert, haversineKm, getEmergencyNumber, createAlert } from '@/lib/alertService';
+import { listenToPendingAlerts, acceptAlert, haversineKm, getEmergencyNumber, createAlert, getMyActiveAlert, getResponderActiveAlert } from '@/lib/alertService';
 import { AlertDoc } from '@/lib/types';
 import { toast } from 'react-hot-toast';
 import { debugLog } from '@/lib/debug';
@@ -45,8 +45,28 @@ export default function Home() {
   const isResponder = !isCivilian;
 
   useEffect(() => {
-    if (!currentUser) { router.replace('/login'); return; }
-  }, [currentUser, router]);
+    if (!currentUser) { 
+      router.replace('/login'); 
+      return; 
+    }
+    // Restore active alert and redirect if on Home
+    const restoreSession = async () => {
+      // If store is empty, check Firestore
+      if (!activeAlert) {
+        const foundAlert = isCivilian 
+          ? await getMyActiveAlert(currentUser.id)
+          : await getResponderActiveAlert(currentUser.id);
+        if (foundAlert) {
+          setActiveAlert(foundAlert);
+          router.push('/active');
+        }
+      } else {
+        // Already have it in store, redirect
+        router.push('/active');
+      }
+    };
+    restoreSession();
+  }, [currentUser, router, activeAlert, isCivilian, setActiveAlert]);
 
   // Responders: listen to pending alerts in real-time
   useEffect(() => {
