@@ -40,6 +40,14 @@ const ProfilePage = () => {
   const [showLocationsModal, setShowLocationsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showNotifModal, setShowNotifModal] = useState(false);
+  const [resolvedAlerts, setResolvedAlerts] = useState<any[]>([]);
+
+  // Fetch history from DB
+  React.useEffect(() => {
+    if (currentUser?.id) {
+       import('@/lib/alertService').then(m => m.getResolvedAlerts(currentUser.id)).then(setResolvedAlerts);
+    }
+  }, [currentUser?.id]);
 
   // Edit form state
   const [editName, setEditName] = useState(currentUser?.username || '');
@@ -246,19 +254,19 @@ const ProfilePage = () => {
                 <X size={18} className="text-gray-500" />
               </button>
             </div>
-            {alertHistory.length === 0 ? (
+            {resolvedAlerts.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">No past emergencies</div>
             ) : (
               <div className="flex flex-col gap-3">
-                {alertHistory.map((a) => (
+                {resolvedAlerts.map((a) => (
                   <div key={a.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-2xl">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${a.severity === 'high' ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-500'}`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${a.severity === 'CRITICAL' ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-500'}`}>
                       🚨
                     </div>
                     <div>
                       <p className="text-sm font-bold text-gray-900">{a.type}</p>
-                      <p className="text-xs text-gray-400">{format(a.date, 'PPp')} • <span className="text-emerald-500 font-bold">Resolved</span></p>
-                      {a.location && <p className="text-[10px] text-gray-400 mt-0.5">📍 {a.location}</p>}
+                      <p className="text-xs text-gray-400">{format(new Date(a.resolvedAt || a.createdAt), 'PPp')} • <span className="text-emerald-500 font-bold">Resolved</span></p>
+                      {a.userLocation?.address && <p className="text-[10px] text-gray-400 mt-0.5">📍 {a.userLocation.address}</p>}
                     </div>
                   </div>
                 ))}

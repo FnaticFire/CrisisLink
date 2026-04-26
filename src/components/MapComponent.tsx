@@ -130,22 +130,28 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
       ))}
 
       {/* Responder tracking position */}
-      {trackingPos && (
+      {trackingPos && alerts[0] && (
         <>
           <Marker position={trackingPos} icon={typeof window !== 'undefined' ? L.divIcon({
             className: 'responder-marker',
-            html: '<div style="width:28px;height:28px;background:linear-gradient(135deg,#10B981,#059669);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(16,185,129,0.5);display:flex;align-items:center;justify-content:center;font-size:12px;">🚗</div>',
-            iconSize: [28, 28],
+            html: '<div style="width:30px;height:30px;background:linear-gradient(135deg,#10B981,#059669);border:4px solid white;border-radius:50%;box-shadow:0 4px 12px rgba(16,185,129,0.6);display:flex;align-items:center;justify-content:center;font-size:14px;z-index:1000;">🚗</div>',
+            iconSize: [30, 30],
           }) : undefined}>
             <Popup>Responder en route</Popup>
           </Marker>
           
-          {/* Mission Path Line */}
+          {/* Mission Path Line between Survivor and Responder */}
           <Polyline 
-            positions={[[center[0], center[1]], trackingPos]} 
-            pathOptions={{ color: '#10B981', weight: 3, dashArray: '8, 8', opacity: 0.6 }} 
+            positions={[
+              [alerts[0].userLocation.lat, alerts[0].userLocation.lng], 
+              trackingPos
+            ]} 
+            pathOptions={{ color: '#10B981', weight: 5, dashArray: '10, 10', opacity: 0.8 }} 
           />
-          <MapBoundsHandler pos1={[center[0], center[1]]} pos2={trackingPos} />
+          <MapBoundsHandler 
+             pos1={[alerts[0].userLocation.lat, alerts[0].userLocation.lng]} 
+             pos2={trackingPos} 
+          />
         </>
       )}
 

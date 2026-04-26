@@ -119,6 +119,8 @@ export default function ActiveEmergencyPage() {
   useEffect(() => { aiChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [aiMessages]);
   useEffect(() => { humanChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [humanMessages]);
 
+  const formatETA = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
   if (!alert) return (
     <div className="h-[100dvh] w-full bg-slate-950 flex items-center justify-center">
       <Loader2 className="text-primary animate-spin" size={32} />
@@ -135,7 +137,7 @@ export default function ActiveEmergencyPage() {
   
   // Contextual Quick Replies
   const quickReplies = isResponder 
-    ? GET_RESPONDER_QUICK_REPLIES(currentUser?.role, alert.type)
+    ? GET_RESPONDER_QUICK_REPLIES(currentUser?.role, alert.type, formatETA(etaSec))
     : GET_CIVILIAN_QUICK_REPLIES(alert.type);
 
   const handleResolve = async () => {
@@ -217,7 +219,6 @@ export default function ActiveEmergencyPage() {
     } catch { toast.error('Quick reply failed.'); }
   };
 
-  const formatETA = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-slate-950 overflow-hidden relative">
@@ -240,7 +241,7 @@ export default function ActiveEmergencyPage() {
           {hasResponder && (
             <div className="bg-slate-950/80 backdrop-blur px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-1.5">
               <Navigation size={10} className="text-primary" />
-              <span className="text-white font-semibold text-[11px]">{formatETA(etaSec)} • {distKm.toFixed(1)} km</span>
+              <span className="text-white font-semibold text-[11px]">ETA: {formatETA(etaSec)} • {distKm.toFixed(1)} km</span>
             </div>
           )}
         </div>

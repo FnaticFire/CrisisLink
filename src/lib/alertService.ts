@@ -49,6 +49,25 @@ export async function getMyActiveAlert(userId: string): Promise<AlertDoc | null>
   }
 }
 
+// ─── Get resolved alerts for history ───
+export async function getResolvedAlerts(userId: string): Promise<AlertDoc[]> {
+  try {
+    const q = query(
+      collection(db, ALERTS_COL),
+      where('userId', '==', userId),
+      where('status', '==', 'resolved'),
+      limit(20)
+    );
+    const snap = await getDocs(q);
+    const alerts = snap.docs.map(d => d.data() as AlertDoc);
+    alerts.sort((a, b) => (b.resolvedAt || 0) - (a.resolvedAt || 0));
+    return alerts;
+  } catch (err) {
+    debugError('Firestore', 'getResolvedAlerts failed:', err);
+    return [];
+  }
+}
+
 // ─── Get active mission for a responder ───
 export async function getResponderActiveAlert(responderId: string): Promise<AlertDoc | null> {
   try {

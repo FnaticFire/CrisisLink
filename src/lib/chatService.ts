@@ -52,17 +52,17 @@ export function listenToChat(alertId: string, callback: (msgs: ChatMsg[]) => voi
 }
 
 // ─── ROLE-BASED RESPONDER REPLIES ───
-export const GET_RESPONDER_QUICK_REPLIES = (role: string = 'police', type: string = 'emergency') => {
-  const base = ["I'm on my way", "ETA 3 mins", "Help is arriving"];
+export const GET_RESPONDER_QUICK_REPLIES = (role: string = 'police', type: string = 'emergency', eta: string = '3 mins') => {
+  const base = ["I'm on my way", `ETA: ${eta}`, "Help is arriving"];
   
   if (role.toLowerCase().includes('police')) {
-    return [...base, "Unit 10-4 en-route", "Secure the perimeter", "Stay low, don't move"];
+    return [...base, "Unit en-route", "Stay low, don't move"];
   }
   if (role.toLowerCase().includes('fire')) {
-    return [...base, "Ladder truck dispatched", "Are guests evacuated?", "Close doors if possible"];
+    return [...base, "Ladder truck dispatched", "Are guests evacuated?"];
   }
   if (role.toLowerCase().includes('hospital') || role.toLowerCase().includes('medical')) {
-    return [...base, "Ambulance dispatched", "Is the patient conscious?", "Check for breathing"];
+    return [...base, "Ambulance dispatched", "Is the patient conscious?"];
   }
   
   return base;
