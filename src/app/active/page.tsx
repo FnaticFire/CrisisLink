@@ -34,6 +34,21 @@ export default function ActiveEmergencyPage() {
 
   // Real-time Firestore sync
   useEffect(() => {
+    if (!currentUser) {
+      router.replace('/login');
+      return;
+    }
+
+    // SESSION EXPIRY CHECK (10 MINS)
+    const loginAt = localStorage.getItem('crisislink_login_at');
+    const now = Date.now();
+    if (loginAt && now - parseInt(loginAt) > 10 * 60 * 1000) {
+      localStorage.removeItem('crisislink_login_at');
+      useAppStore.getState().setCurrentUser(null);
+      router.replace('/login');
+      return;
+    }
+
     if (!activeAlert?.id) { 
       debugError('ActivePage', 'No active alert found');
       router.push('/'); 
@@ -57,7 +72,7 @@ export default function ActiveEmergencyPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAlert?.id]);
 
-  // Real-time Chat sync
+// Real-time Chat sync
   useEffect(() => {
     if (!activeAlert?.id) return;
     const unsub = listenToChat(activeAlert.id, (msgs) => {
@@ -69,6 +84,26 @@ export default function ActiveEmergencyPage() {
     return () => unsub();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAlert?.id]);
+
+  // ── LIVE GPS TRACKING ──
+  useEffect(() => {
+    if (!alert?.id || !typeof window) return;
+
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        if (isCivilian) {
+          import('@/lib/alertService').then(m => m.updateUserLocationInAlert(alert.id, latitude, longitude));
+        } else {
+          import('@/lib/alertService').then(m => m.updateResponderLocation(alert.id, latitude, longitude));
+        }
+      },
+      (err) => debugError('GPS-Tracking', err),
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(id);
+  }, [alert?.id, isCivilian]);
 
   // AI Welcome
   useEffect(() => {

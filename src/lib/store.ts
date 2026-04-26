@@ -30,35 +30,45 @@ interface AppState {
   setRole: (role: any) => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  currentUser: null,
-  currentLocation: null,
-  activeAlertId: null,
-  activeAlert: null,
+import { persist, createJSONStorage } from 'zustand/middleware';
 
-  notifications: [],
-  savedLocations: [],
-  alertHistory: [],
-  messages: [],
-  responders: [],
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      currentUser: null,
+      currentLocation: null,
+      activeAlertId: null,
+      activeAlert: null,
 
-  setCurrentUser: (user) => set({ currentUser: user }),
-  updateUser: (updates) => set((state) => ({ 
-    currentUser: state.currentUser ? { ...state.currentUser, ...updates } : null 
-  })),
-  setCurrentLocation: (loc) => set({ currentLocation: loc }),
-  setActiveAlertId: (id) => set({ activeAlertId: id }),
-  setActiveAlert: (alert) => set({ activeAlert: alert }),
-  resolveAlert: () => set({ activeAlert: null }),
-  updateUserLocation: (lat, lng, addr) => set((state) => ({ 
-    currentLocation: { lat, lng, address: addr },
-    currentUser: state.currentUser ? { ...state.currentUser, location: { lat, lng, address: addr } } : null
-  })),
-  markNotificationsRead: () => set((state) => ({ notifications: state.notifications.map(n => ({ ...n, read: true })) })),
-  addMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
-  markMessagesRead: () => {}, // Mock stub
-  updateCurrentUser: (updates) => set((state) => ({ currentUser: state.currentUser ? { ...state.currentUser, ...updates } : null })),
-  addSavedLocation: () => {},
-  removeSavedLocation: () => {},
-  setRole: () => {},
-}));
+      notifications: [],
+      savedLocations: [],
+      alertHistory: [],
+      messages: [],
+      responders: [],
+
+      setCurrentUser: (user) => set({ currentUser: user }),
+      updateUser: (updates) => set((state) => ({ 
+        currentUser: state.currentUser ? { ...state.currentUser, ...updates } : null 
+      })),
+      setCurrentLocation: (loc) => set({ currentLocation: loc }),
+      setActiveAlertId: (id) => set({ activeAlertId: id }),
+      setActiveAlert: (alert) => set({ activeAlert: alert }),
+      resolveAlert: () => set({ activeAlert: null }),
+      updateUserLocation: (lat, lng, addr) => set((state) => ({ 
+        currentLocation: { lat, lng, address: addr },
+        currentUser: state.currentUser ? { ...state.currentUser, location: { lat, lng, address: addr } } : null
+      })),
+      markNotificationsRead: () => set((state) => ({ notifications: state.notifications.map(n => ({ ...n, read: true })) })),
+      addMessage: (m) => set((s) => ({ messages: [...s.messages, m] })),
+      markMessagesRead: () => {}, // Mock stub
+      updateCurrentUser: (updates) => set((state) => ({ currentUser: state.currentUser ? { ...state.currentUser, ...updates } : null })),
+      addSavedLocation: () => {},
+      removeSavedLocation: () => {},
+      setRole: () => {},
+    }),
+    {
+      name: 'crisislink-storage',
+      storage: createJSONStorage(() => localStorage),
+    }
+  )
+);

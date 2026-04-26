@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useAppStore } from '@/lib/store';
@@ -131,16 +131,25 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
 
       {/* Responder tracking position */}
       {trackingPos && (
-        <Marker position={trackingPos} icon={typeof window !== 'undefined' ? L.divIcon({
-          className: 'responder-marker',
-          html: '<div style="width:28px;height:28px;background:linear-gradient(135deg,#10B981,#059669);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(16,185,129,0.5);display:flex;align-items:center;justify-content:center;font-size:12px;">🚗</div>',
-          iconSize: [28, 28],
-        }) : undefined}>
-          <Popup>Responder en route</Popup>
-        </Marker>
+        <>
+          <Marker position={trackingPos} icon={typeof window !== 'undefined' ? L.divIcon({
+            className: 'responder-marker',
+            html: '<div style="width:28px;height:28px;background:linear-gradient(135deg,#10B981,#059669);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(16,185,129,0.5);display:flex;align-items:center;justify-content:center;font-size:12px;">🚗</div>',
+            iconSize: [28, 28],
+          }) : undefined}>
+            <Popup>Responder en route</Popup>
+          </Marker>
+          
+          {/* Mission Path Line */}
+          <Polyline 
+            positions={[[center[0], center[1]], trackingPos]} 
+            pathOptions={{ color: '#10B981', weight: 3, dashArray: '8, 8', opacity: 0.6 }} 
+          />
+          <MapBoundsHandler pos1={[center[0], center[1]]} pos2={trackingPos} />
+        </>
       )}
 
-      <RecenterMap lat={center[0]} lng={center[1]} />
+      <RecenterMap lat={center[0]} lng={center[1]} tracking={!!trackingPos} />
       
       <style jsx global>{`
         .pulse-blue {
@@ -167,11 +176,20 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
   );
 };
 
-function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
+function RecenterMap({ lat, lng, tracking }: { lat: number; lng: number; tracking?: boolean }) {
   const map = useMap();
   useEffect(() => {
-    map.setView([lat, lng]);
-  }, [lat, lng, map]);
+    if (!tracking) map.setView([lat, lng]);
+  }, [lat, lng, map, tracking]);
+  return null;
+}
+
+function MapBoundsHandler({ pos1, pos2 }: { pos1: [number, number]; pos2: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    const bounds = L.latLngBounds([pos1, pos2]);
+    map.fitBounds(bounds, { padding: [50, 50] });
+  }, [pos1, pos2, map]);
   return null;
 }
 

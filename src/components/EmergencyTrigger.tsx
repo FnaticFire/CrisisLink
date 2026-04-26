@@ -146,6 +146,7 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
       id: alertId,
       userId: currentUser?.id || 'guest',
       userName: currentUser?.username || 'Unknown',
+      userPhone: currentUser?.phone || '',
       type: aiResult.emergencyType,
       severity: aiResult.severity,
       status: 'pending',

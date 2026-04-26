@@ -122,6 +122,18 @@ export async function updateResponderLocation(alertId: string, lat: number, lng:
   }
 }
 
+// ─── Update civilian (user) location on alert ───
+export async function updateUserLocationInAlert(alertId: string, lat: number, lng: number): Promise<void> {
+  try {
+    const ref = doc(db, ALERTS_COL, alertId);
+    await updateDoc(ref, {
+      userLocation: { lat, lng }
+    });
+  } catch (err) {
+    debugError('Firestore', 'updateUserLocationInAlert failed:', err);
+  }
+}
+
 // ─── Resolve alert ───
 export async function resolveAlertInDB(alertId: string): Promise<void> {
   try {
@@ -165,4 +177,20 @@ export function getEmergencyNumber(type: string): { label: string; number: strin
   if (t.includes('violence') || t.includes('robbery') || t.includes('assault') || t.includes('police')) return { label: 'Police', number: '100' };
   if (t.includes('flood') || t.includes('disaster')) return { label: 'NDRF', number: '011-24363260' };
   return { label: 'Emergency', number: '112' };
+}
+// ─── Utility: Clear all alerts (for testing only) ───
+export async function clearAllAlerts(): Promise<void> {
+  try {
+    const snap = await getDocs(collection(db, ALERTS_COL));
+    // For large collections this should be done in batches, but for demo it is fine
+    const promises = snap.docs.map(d => {
+      // Also clear subcollections if any, but alerts don't have them yet
+      // Messages are in their own collection per alert
+      return setDoc(doc(db, ALERTS_COL, d.id), { status: 'resolved', resolvedAt: Date.now() });
+    });
+    await Promise.all(promises);
+    debugLog('Firestore', 'All alerts cleared');
+  } catch (err) {
+    debugError('Firestore', 'clearAllAlerts failed:', err);
+  }
 }

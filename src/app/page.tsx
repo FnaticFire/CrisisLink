@@ -56,19 +56,30 @@ export default function Home() {
       router.replace('/login'); 
       return; 
     }
+
+    // SESSION EXPIRY CHECK (10 MINS)
+    const loginAt = localStorage.getItem('crisislink_login_at');
+    const now = Date.now();
+    if (loginAt && now - parseInt(loginAt) > 10 * 60 * 1000) {
+      toast.error('Session expired. Please log in again.');
+      localStorage.removeItem('crisislink_login_at');
+      useAppStore.getState().setCurrentUser(null);
+      router.replace('/login');
+      return;
+    }
+
     // Restore active alert and redirect if on Home
     const restoreSession = async () => {
+      let foundAlert = activeAlert;
       // If store is empty, check Firestore
-      if (!activeAlert) {
-        const foundAlert = isCivilian 
+      if (!foundAlert) {
+        foundAlert = isCivilian 
           ? await getMyActiveAlert(currentUser.id)
           : await getResponderActiveAlert(currentUser.id);
-        if (foundAlert) {
-          setActiveAlert(foundAlert);
-          router.push('/active');
-        }
-      } else {
-        // Already have it in store, redirect
+      }
+      
+      if (foundAlert) {
+        setActiveAlert(foundAlert);
         router.push('/active');
       }
     };
