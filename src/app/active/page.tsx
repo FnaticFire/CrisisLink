@@ -126,16 +126,30 @@ export default function ActiveEmergencyPage() {
         apiKey = 'AIzaSyCWZ-PsQ2OS6WQWKRLkBj7gsqBjDVkPn8E';
       }
       const genAI = new GoogleGenerativeAI(apiKey);
-      // Explicitly using the string "gemini-2.5-flash-lite" as requested.
-      // If this throws an error, the catch block will alert the user.
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
-      const result = await model.generateContent(
-        `You are CrisisLink AI (Gemini 2.5), an emergency safety advisor. Emergency: ${alert.type}. User: ${msg}`
-      );
-      const text = result.response.text();
+      
+      let text = '';
+      try {
+        // Step 1: Try the requested Gemini 2.5 experimental model
+        const model25 = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+        const result = await model25.generateContent(
+          `You are CrisisLink AI (Gemini 2.5), an emergency safety advisor. Emergency: ${alert.type}. User: ${msg}`
+        );
+        text = result.response.text();
+      } catch (e25) {
+        debugError('AI-2.5-Failed', e25);
+        // Step 2: Seamless fallback to stable 1.5-flash so the demo doesn't break
+        const model15 = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const result = await model15.generateContent(
+          `You are CrisisLink AI (using local fallback), an emergency safety advisor. Emergency: ${alert.type}. User: ${msg}`
+        );
+        text = result.response.text();
+        // Notify user about the API fallback
+        toast('Gemini 2.5 unsupported by this Key. Using stable fallback.', { icon: '🤖', duration: 3000 });
+      }
+
       setAiMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text }]);
     } catch (err: any) {
-      toast.error(`Gemini 2.5 API Failed: ${err.message}. Showing fallback guidance.`, { duration: 6000 });
+      toast.error(`AI API Failed: ${err.message}. Showing static guidance.`);
       const t = (alert.type || '').toLowerCase();
       let fb = 'Stay in a safe location. Help is on the way.';
       if (t.includes('fire')) fb = 'Stay low below smoke. Find exit.';
