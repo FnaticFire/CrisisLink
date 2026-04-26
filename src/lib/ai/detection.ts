@@ -80,33 +80,32 @@ export async function analyzeEmergencyImage(imageBase64: string): Promise<string
       ? imageBase64.split(',')[1]
       : imageBase64;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: `You are an emergency scene analyzer. Analyze this image and return ONLY a JSON array of up to 10 concise labels that describe the emergency scene (e.g. ["Fire","Smoke","Accident","Blood","Crowd"]).
-                       Focus on: hazards, injury signs, emergency type, environment. 
-                       Return ONLY valid JSON array, no extra text.`,
-              },
-              {
-                inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: base64Data,
-                },
-              },
-            ],
-          }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 150 },
-        }),
+    const models = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+    let data;
+    
+    for (const model of models) {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: `Identify top 10 hazards/labels in this scene (e.g. ["Fire","Smoke"]). Return ONLY JSON array.` },
+                { inline_data: { mime_type: 'image/jpeg', data: base64Data } },
+              ],
+            }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 150 },
+          }),
+        }
+      );
+      if (response.ok) {
+        data = await response.json();
+        break;
       }
-    );
+    }
 
-    const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '["Emergency"]';
     
     // Extract JSON array from response

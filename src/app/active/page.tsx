@@ -137,14 +137,23 @@ export default function ActiveEmergencyPage() {
         text = result.response.text();
       } catch (e25) {
         debugError('AI-2.5-Failed', e25);
-        // Step 2: Seamless fallback to stable 1.5-flash so the demo doesn't break
-        const model15 = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        const result = await model15.generateContent(
-          `You are CrisisLink AI (using local fallback), an emergency safety advisor. Emergency: ${alert.type}. User: ${msg}`
-        );
-        text = result.response.text();
-        // Notify user about the API fallback
-        toast('Gemini 2.5 unsupported by this Key. Using stable fallback.', { icon: '🤖', duration: 3000 });
+        try {
+          // Step 2: Try 1.5-flash
+          const model15 = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+          const result = await model15.generateContent(
+            `You are CrisisLink AI, an emergency advisor. Emergency: ${alert.type}. User: ${msg}`
+          );
+          text = result.response.text();
+        } catch (e15) {
+          debugError('AI-1.5-Failed', e15);
+          // Step 3: Ultimate fallback to gemini-pro (most compatible)
+          const modelPro = genAI.getGenerativeModel({ model: 'gemini-pro' });
+          const result = await modelPro.generateContent(
+            `You are CrisisLink AI, an emergency advisor. Emergency: ${alert.type}. User: ${msg}`
+          );
+          text = result.response.text();
+          toast('Using Pro-compatible fallback.', { icon: '🛡️' });
+        }
       }
 
       setAiMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text }]);

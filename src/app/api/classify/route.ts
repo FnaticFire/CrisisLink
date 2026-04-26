@@ -14,7 +14,14 @@ export async function POST(request: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    let model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    
+    // Attempt with Flash first, if it fails, try Pro
+    try {
+      await model.generateContent("test");
+    } catch {
+      model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    }
 
     const prompt = `You are CrisisLink's emergency triage AI (using Gemini 2.5 branding). Analyze this distress call and scene.
 
