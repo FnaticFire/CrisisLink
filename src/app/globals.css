@@ -1,82 +1,138 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #E53935;
-  --color-secondary: #4A90E2;
-  --color-accent: #F5F5F5;
+  --color-primary: #2563EB;
+  --color-primary-light: #3B82F6;
+  --color-primary-dark: #1D4ED8;
+  --color-accent-coral: #F87171;
+  --color-accent-mint: #34D399;
+  --color-accent-amber: #FBBF24;
+  --color-accent-violet: #A78BFA;
+  --color-surface: #F0F4F8;
+  --color-surface-warm: #F8FAFC;
   --radius-xl: 16px;
   --radius-2xl: 24px;
+  --radius-3xl: 32px;
 }
 
 :root {
-  --background: #FFFFFF;
-  --foreground: #1A1A1A;
-  --surface: #F8F9FA;
+  --background: #F0F4F8;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --muted: #94A3B8;
 }
 
 body {
-  background-color: #f0f2f5;
+  background-color: var(--background);
   color: var(--foreground);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glassmorphism utility */
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-/* Mobile container - centered inside browser */
+/* ── Mobile Container ── */
 .app-container {
   max-width: 420px;
   margin: 0 auto;
   min-height: 100vh;
-  background: var(--background);
+  min-height: 100dvh;
+  background: linear-gradient(180deg, #EEF2FF 0%, #F0F4F8 30%, #F8FAFC 100%);
   position: relative;
-  box-shadow: 0 0 40px rgba(0,0,0,0.05);
+  box-shadow: 0 0 60px rgba(0,0,0,0.06);
   display: flex;
   flex-direction: column;
 }
 
-.bottom-nav-height {
-  padding-bottom: 80px;
+/* ── Glass Morphism ── */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
-/* Soft shadows */
+.glass-dark {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── Shadows ── */
 .soft-shadow {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 6px 16px rgba(0, 0, 0, 0.04);
 }
 
-/* Rounded corners */
-.rounded-btn {
-  border-radius: 12px;
+.card-shadow {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 4px 12px rgba(0, 0, 0, 0.04),
+    0 12px 28px rgba(0, 0, 0, 0.03);
 }
 
-.rounded-card {
-  border-radius: 20px;
+.elevated {
+  box-shadow:
+    0 2px 4px rgba(37, 99, 235, 0.06),
+    0 8px 24px rgba(37, 99, 235, 0.08);
 }
 
-/* Interactions */
+/* ── Interactions ── */
+.tap-effect {
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.15s ease;
+}
 .tap-effect:active {
-  transform: scale(0.96);
-  transition: transform 0.1s ease;
+  transform: scale(0.97);
+  opacity: 0.9;
 }
 
-/* Hide scrollbar */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+/* ── Scrollbar ── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Leaflet map visibility fix */
+/* ── Leaflet ── */
 .leaflet-container {
   width: 100%;
   height: 100%;
   z-index: 1;
+}
+
+/* ── Bottom Nav Height ── */
+.bottom-nav-height { padding-bottom: 80px; }
+
+/* ── Gradient Text ── */
+.text-gradient {
+  background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Shimmer Effect ── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* ── Pulse ── */
+@keyframes soft-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.soft-pulse { animation: soft-pulse 2s ease-in-out infinite; }
+
+/* ── Card Hover ── */
+.card-hover {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(37, 99, 235, 0.1);
 }

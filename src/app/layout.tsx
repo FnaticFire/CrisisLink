@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import { Toaster } from "react-hot-toast";
 import FirebaseInit from "@/components/FirebaseInit";
 import DebugBar from "@/components/DebugBar";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "CrisisLink | Emergency Coordination",
@@ -20,7 +17,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
-      <body className={`${inter.className} min-h-full`} suppressHydrationWarning>
+      <body className="min-h-full" suppressHydrationWarning>
         <FirebaseInit />
         <DebugBar />
         <div className="app-container overflow-hidden">

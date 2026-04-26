@@ -77,14 +77,17 @@ export default function ActiveEmergencyPage({ params }: { params: Promise<{ id: 
   const hasResponderAccepted = alert.status === 'accepted';
   const canSeeHumanChat = hasResponderAccepted; // Only open chat if someone is coming
 
-  const activeRespondersCount = alert.responders?.length || 0;
+  const activeRespondersCount = alert.responderId ? 1 : 0;
 
   const handleAccept = async () => {
     if (!currentUser) return;
     try {
       await updateDoc(doc(db, 'alerts', alert.id!), {
         status: 'accepted',
-        responders: arrayUnion(currentUser.id)
+        responderId: currentUser.id,
+        responderName: currentUser.username,
+        responderPhone: currentUser.phone || '',
+        responderRole: currentUser.role,
       });
       // System message
       await addDoc(collection(db, `alerts/${alert.id}/messages`), {

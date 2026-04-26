@@ -1,254 +1,245 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ShieldAlert, Users, Landmark, BookOpen, ChevronRight, X } from 'lucide-react';
+import { ShieldAlert, Users, MapPin, BookOpen, ChevronRight, X, Phone, Zap, Heart, Flame, Droplets, Shield, CheckCircle2, Navigation, Loader2 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
-import ResponderCard from '@/components/ResponderCard';
 import EmergencyTrigger from '@/components/EmergencyTrigger';
+import { listenToPendingAlerts, acceptAlert, haversineKm, getEmergencyNumber } from '@/lib/alertService';
+import { AlertDoc } from '@/lib/types';
+import { toast } from 'react-hot-toast';
+import { debugLog } from '@/lib/debug';
 
-// Safety tips modal content
 const SAFETY_TIPS = [
-  { icon: '🔥', title: 'Fire Emergency', tips: ['Stay low below smoke. Crawl to exit.', 'Touch door before opening — if hot, find another way.', 'Never use elevators during fire. Use stairs only.', 'Meet at the pre-designated assembly point.'] },
-  { icon: '🏥', title: 'Medical Emergency', tips: ['Call 108 immediately for ambulance.', 'Do NOT move a seriously injured person.', 'Apply firm pressure on bleeding wounds.', 'For cardiac arrest, start CPR: 30 compressions + 2 breaths.'] },
-  { icon: '🚗', title: 'Road Accident', tips: ['Turn on hazard lights. Set up warning triangles.', 'Do not remove helmet from injured motorcyclist.', 'Call 112 (Police) + 108 (Ambulance).', 'Note the vehicle registration number.'] },
-  { icon: '🌊', title: 'Flood / Natural Disaster', tips: ['Move to higher ground immediately.', 'Do not walk through moving water — 6 inches can knock you down.', 'Avoid downed power lines.', 'Call NDRF: 011-24363260.'] },
-  { icon: '🆘', title: 'Personal Safety', tips: ['Trust your instincts — if something feels wrong, act.', 'Share your live location with a trusted contact.', 'Scream "FIRE!" loudly — people respond faster.', 'Use CrisisLink to alert nearby responders instantly.'] },
+  { icon: '🔥', title: 'Fire Emergency', tips: ['Stay low below smoke.', 'Touch door before opening — if hot, find another way.', 'Never use elevators. Use stairs.', 'Meet at assembly point.'] },
+  { icon: '🏥', title: 'Medical Emergency', tips: ['Call 108 for ambulance.', 'Do NOT move injured person.', 'Apply firm pressure on bleeding.', 'Start CPR if needed: 30 compressions, 2 breaths.'] },
+  { icon: '🚗', title: 'Road Accident', tips: ['Turn on hazard lights.', 'Do not remove helmet from injured motorcyclist.', 'Call 112 (Police) + 108 (Ambulance).', 'Note vehicle registration number.'] },
+  { icon: '🌊', title: 'Flood', tips: ['Move to higher ground.', 'Do not walk through moving water.', 'Avoid downed power lines.', 'Call NDRF: 011-24363260.'] },
 ];
 
 const EMERGENCY_NUMBERS = [
-  { label: 'National Emergency', number: '112', color: 'bg-red-500' },
-  { label: 'Ambulance', number: '108', color: 'bg-blue-500' },
-  { label: 'Police', number: '100', color: 'bg-indigo-500' },
-  { label: 'Fire Brigade', number: '101', color: 'bg-orange-500' },
-  { label: "Women's Helpline", number: '1091', color: 'bg-pink-500' },
-  { label: 'Child Helpline', number: '1098', color: 'bg-purple-500' },
+  { label: 'Emergency', number: '112', icon: Phone, gradient: 'from-red-500 to-rose-600' },
+  { label: 'Ambulance', number: '108', icon: Heart, gradient: 'from-blue-500 to-blue-600' },
+  { label: 'Police', number: '100', icon: Shield, gradient: 'from-indigo-500 to-indigo-600' },
+  { label: 'Fire', number: '101', icon: Flame, gradient: 'from-orange-500 to-amber-600' },
+  { label: 'Women', number: '1091', icon: Zap, gradient: 'from-pink-500 to-rose-500' },
+  { label: 'Flood', number: '1078', icon: Droplets, gradient: 'from-cyan-500 to-teal-600' },
 ];
 
 export default function Home() {
-  const { responders, currentUser, updateUserLocation, activeAlert } = useAppStore();
+  const { currentUser, activeAlert, setActiveAlert } = useAppStore();
   const router = useRouter();
-  
   const [showTrigger, setShowTrigger] = useState(false);
   const [showSafetyTips, setShowSafetyTips] = useState(false);
-  const [showHospitals, setShowHospitals] = useState(false);
   const [selectedTip, setSelectedTip] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [pendingAlerts, setPendingAlerts] = useState<AlertDoc[]>([]);
+  const [accepting, setAccepting] = useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (!currentUser) {
-      router.replace('/login');
-    }
+  const isCivilian = currentUser?.role === 'civilian';
+  const isResponder = !isCivilian;
+
+  useEffect(() => {
+    if (!currentUser) { router.replace('/login'); return; }
   }, [currentUser, router]);
 
+  // Responders: listen to pending alerts in real-time
+  useEffect(() => {
+    if (!isResponder || !currentUser) return;
+    const unsub = listenToPendingAlerts((alerts) => {
+      debugLog('Responder', `${alerts.length} active alerts`);
+      setPendingAlerts(alerts);
+    });
+    return () => unsub();
+  }, [isResponder, currentUser]);
 
+  const handleAcceptAlert = async (alert: AlertDoc) => {
+    if (!currentUser || accepting) return;
+    setAccepting(alert.id);
+    try {
+      await acceptAlert(alert.id, currentUser);
+      setActiveAlert(alert);
+      toast.success('Alert accepted. Navigate to location.');
+      router.push('/active');
+    } catch (err) {
+      toast.error('Failed to accept alert.');
+    } finally {
+      setAccepting(null);
+    }
+  };
 
-  const quickActions = [
-    { label: 'Emergency', icon: ShieldAlert, color: 'bg-red-50 text-red-500', action: () => setShowTrigger(true) },
-    { label: 'Responders', icon: Users, color: 'bg-blue-50 text-blue-500', path: '/alerts' },
-    { label: 'Hospitals', icon: Landmark, color: 'bg-emerald-50 text-emerald-500', action: () => setShowHospitals(true) },
-    { label: 'Safety Tips', icon: BookOpen, color: 'bg-amber-50 text-amber-500', action: () => setShowSafetyTips(true) },
+  const quickActions = isCivilian ? [
+    { label: 'Emergency', icon: ShieldAlert, bg: 'bg-red-50', color: 'text-red-500', ring: 'ring-red-100', action: () => setShowTrigger(true) },
+    { label: 'Map', icon: MapPin, bg: 'bg-blue-50', color: 'text-blue-500', ring: 'ring-blue-100', path: '/map' },
+    { label: 'Alerts', icon: Users, bg: 'bg-emerald-50', color: 'text-emerald-500', ring: 'ring-emerald-100', path: '/alerts' },
+    { label: 'Safety', icon: BookOpen, bg: 'bg-amber-50', color: 'text-amber-500', ring: 'ring-amber-100', action: () => setShowSafetyTips(true) },
+  ] : [
+    { label: 'Map', icon: MapPin, bg: 'bg-blue-50', color: 'text-blue-500', ring: 'ring-blue-100', path: '/map' },
+    { label: 'Safety', icon: BookOpen, bg: 'bg-amber-50', color: 'text-amber-500', ring: 'ring-amber-100', action: () => setShowSafetyTips(true) },
+    { label: 'Profile', icon: Shield, bg: 'bg-violet-50', color: 'text-violet-500', ring: 'ring-violet-100', path: '/profile' },
   ];
-
-  const filteredResponders = searchQuery
-    ? responders.filter(
-        (r) =>
-          (r.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (r.description || '').toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : responders;
 
   return (
     <div className="flex flex-col flex-1 pb-24 overflow-y-auto no-scrollbar">
       <TopBar onSearch={setSearchQuery} searchQuery={searchQuery} />
 
-      <main className="flex-1 px-6 pt-4">
+      <main className="flex-1 px-5 pt-2">
         {/* Active Alert Banner */}
         {activeAlert && (
-          <Link href="/map">
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 to-red-700 p-4 mb-4 soft-shadow cursor-pointer animate-pulse">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                  <ShieldAlert size={20} className="text-white" />
+          <Link href="/active">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-500 via-rose-500 to-orange-500 p-4 mb-5 card-shadow">
+              <div className="absolute inset-0 shimmer" />
+              <div className="relative flex items-center gap-3">
+                <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm"><ShieldAlert size={22} className="text-white" /></div>
+                <div className="flex-1">
+                  <p className="text-white font-bold text-sm">Active Emergency</p>
+                  <p className="text-white/80 text-xs">{activeAlert.type} • Tap to view</p>
                 </div>
-                <div>
-                  <p className="text-white font-black text-sm uppercase tracking-tight">🚨 Active Emergency</p>
-                  <p className="text-white/80 text-xs">{activeAlert.type} • Help is en route</p>
-                </div>
-                <ChevronRight size={20} className="text-white ml-auto" />
+                <ChevronRight size={20} className="text-white/60" />
               </div>
             </div>
           </Link>
         )}
 
-        {/* Emergency Banner */}
-        <div
-          onClick={() => setShowTrigger(true)}
-          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-[#FF5252] p-6 mb-8 soft-shadow cursor-pointer tap-effect active:scale-95 transition-transform"
-        >
-          <div className="relative z-10 flex flex-col gap-2">
-            <h3 className="text-white text-xl font-bold">Emergency Support Available</h3>
-            <p className="text-white/80 text-sm font-medium pr-12">Connect instantly with nearby responders and authorities.</p>
-            <button className="mt-2 w-max bg-white text-primary px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-black/5">
-              Trigger Alert
-            </button>
+        {/* Hero Card — only for civilians */}
+        {isCivilian && (
+          <div onClick={() => setShowTrigger(true)} className="relative overflow-hidden rounded-3xl p-6 mb-6 card-shadow cursor-pointer tap-effect" style={{ background: 'linear-gradient(135deg, #2563EB 0%, #4F46E5 50%, #7C3AED 100%)' }}>
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center"><Shield size={16} className="text-white" /></div>
+                <span className="text-white/70 text-xs font-semibold uppercase tracking-widest">CrisisLink</span>
+              </div>
+              <h3 className="text-white text-xl font-bold leading-tight mb-1">Emergency Support<br/>Available 24/7</h3>
+              <p className="text-white/60 text-sm mb-4">AI-powered detection. Instant dispatch.</p>
+              <button className="bg-white text-primary px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-shadow">Trigger Alert →</button>
+            </div>
           </div>
-          <ShieldAlert className="absolute -right-4 -bottom-4 text-white/10 w-32 h-32 rotate-12" />
-        </div>
+        )}
 
-        {/* Quick Actions Grid */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        {/* Responder Hero */}
+        {isResponder && (
+          <div className="rounded-3xl p-6 mb-6 card-shadow bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary"><Shield size={20} /></div>
+              <div>
+                <h3 className="text-white font-bold">Responder Dashboard</h3>
+                <p className="text-white/50 text-xs capitalize">{currentUser?.role} Dept • {currentUser?.isAvailable ? 'On Duty' : 'Off Duty'}</p>
+              </div>
+            </div>
+            <p className="text-white/40 text-sm mt-1">Incoming emergency alerts will appear below.</p>
+          </div>
+        )}
+
+        {/* Quick Actions */}
+        <div className={`grid gap-3 mb-6 ${quickActions.length === 4 ? 'grid-cols-4' : 'grid-cols-3'}`}>
           {quickActions.map((action, idx) => {
             const Icon = action.icon;
             const inner = (
-              <div className="flex flex-col items-center gap-2 group cursor-pointer tap-effect">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${action.color} soft-shadow transition-transform group-active:scale-95`}>
-                  <Icon size={24} />
-                </div>
-                <span className="text-[10px] font-bold text-gray-600 text-center uppercase tracking-tight">{action.label}</span>
+              <div className="flex flex-col items-center gap-2">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${action.bg} ${action.color} ring-1 ${action.ring} card-hover`}><Icon size={22} strokeWidth={1.8} /></div>
+                <span className="text-[10px] font-semibold text-slate-500">{action.label}</span>
               </div>
             );
-
-            if ('action' in action && action.action) {
-              return (
-                <button key={idx} onClick={action.action} className="w-full">
-                  {inner}
-                </button>
-              );
-            }
-            return (
-              <Link key={idx} href={(action as any).path}>
-                {inner}
-              </Link>
-            );
+            if ('action' in action && action.action) return <button key={idx} onClick={action.action} className="tap-effect">{inner}</button>;
+            return <Link key={idx} href={(action as any).path}>{inner}</Link>;
           })}
         </div>
 
-        {/* Emergency Numbers */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">Emergency Numbers</h3>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {EMERGENCY_NUMBERS.map((em) => (
-              <a key={em.number} href={`tel:${em.number}`} className="flex flex-col items-center gap-1.5 p-3 bg-white rounded-2xl border border-gray-50 soft-shadow tap-effect active:scale-95 transition-transform">
-                <span className={`w-8 h-8 ${em.color} rounded-full flex items-center justify-center text-white text-xs font-black`}>
-                  {em.number}
-                </span>
-                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-tight text-center leading-tight">{em.label}</span>
-              </a>
-            ))}
-          </div>
-        </div>
-
-        {/* Nearby Responders Section */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-900">
-              {searchQuery ? `Results for "${searchQuery}"` : 'Nearby Responders'}
-            </h3>
-            <Link href="/alerts" className="text-primary text-xs font-bold flex items-center gap-0.5">
-              See All <ChevronRight size={14} />
-            </Link>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            {filteredResponders.length > 0 ? (
-              filteredResponders.slice(0, 4).map((responder) => (
-                <ResponderCard key={responder.id} responder={responder} />
-              ))
+        {/* ── RESPONDER: Incoming Alerts ── */}
+        {isResponder && (
+          <div className="mb-6">
+            <h3 className="text-base font-bold text-slate-800 mb-3">Incoming Alerts ({pendingAlerts.length})</h3>
+            {pendingAlerts.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 card-shadow text-center">
+                <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-400">No active emergencies</p>
+                <p className="text-xs text-slate-300 mt-1">You'll be notified when one appears.</p>
+              </div>
             ) : (
-              <div className="text-center py-10 bg-gray-50 rounded-2xl border border-gray-100">
-                <Users size={32} className="mx-auto mb-3 opacity-30 text-gray-400" />
-                <p className="text-sm font-bold text-gray-400">No responders nearby</p>
-                <p className="text-xs text-gray-300 mt-1">Responders will appear when they register and are within range.</p>
+              <div className="flex flex-col gap-3">
+                {pendingAlerts.map((a) => {
+                  const dial = getEmergencyNumber(a.type);
+                  const dist = currentUser?.location
+                    ? haversineKm(currentUser.location.lat, currentUser.location.lng, a.userLocation.lat, a.userLocation.lng).toFixed(1)
+                    : '?';
+                  const isAccepted = a.status !== 'pending';
+                  return (
+                    <div key={a.id} className="bg-white rounded-2xl p-4 card-shadow border border-slate-50">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg shadow-sm ${a.severity === 'CRITICAL' ? 'bg-red-500' : a.severity === 'HIGH' ? 'bg-orange-500' : 'bg-yellow-500'}`}>
+                          🚨
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-800 truncate">{a.type}</p>
+                          <p className="text-[11px] text-slate-400">{a.userName} • {dist} km away • {a.severity}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 mb-3">{a.reason}</p>
+                      {!isAccepted ? (
+                        <button
+                          onClick={() => handleAcceptAlert(a)}
+                          disabled={accepting === a.id}
+                          className="w-full bg-gradient-to-r from-primary to-indigo-600 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 transition-all"
+                        >
+                          {accepting === a.id ? <Loader2 size={16} className="animate-spin" /> : <Navigation size={16} />}
+                          {accepting === a.id ? 'Accepting...' : 'Accept & Navigate'}
+                        </button>
+                      ) : (
+                        <div className="text-center text-xs text-emerald-500 font-semibold py-2">✓ Accepted by {a.responderName}</div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
-        </div>
+        )}
+
+        {/* Quick Dial — for civilians */}
+        {isCivilian && (
+          <div className="mb-6">
+            <h3 className="text-base font-bold text-slate-800 mb-3">Quick Dial</h3>
+            <div className="grid grid-cols-3 gap-2.5">
+              {EMERGENCY_NUMBERS.map((em) => {
+                const Icon = em.icon;
+                return (
+                  <a key={em.number} href={`tel:${em.number}`} className="flex flex-col items-center gap-2 p-3.5 bg-white rounded-2xl card-shadow card-hover tap-effect">
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${em.gradient} flex items-center justify-center shadow-sm`}><Icon size={18} className="text-white" /></div>
+                    <p className="text-[11px] font-bold text-slate-700">{em.number}</p>
+                    <p className="text-[9px] font-medium text-slate-400">{em.label}</p>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* Emergency Trigger Overlay */}
       {showTrigger && <EmergencyTrigger onClose={() => setShowTrigger(false)} />}
 
-      {/* Safety Tips Modal */}
       {showSafetyTips && (
-        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-end p-4">
-          <div className="w-full bg-white rounded-3xl p-6 max-h-[80vh] overflow-y-auto no-scrollbar animate-in slide-in-from-bottom-10 duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-black text-gray-900">Safety Tips</h2>
-              <button onClick={() => setShowSafetyTips(false)} className="p-2 bg-gray-100 rounded-full text-gray-500">
-                <X size={20} />
-              </button>
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-end p-4">
+          <div className="w-full bg-white rounded-3xl p-6 max-h-[80vh] overflow-y-auto no-scrollbar card-shadow">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-slate-900">Safety Tips</h2>
+              <button onClick={() => setShowSafetyTips(false)} className="p-2 bg-slate-100 rounded-xl text-slate-400"><X size={18} /></button>
             </div>
-            {/* Category tabs */}
-            <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
+            <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
               {SAFETY_TIPS.map((tip, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSelectedTip(i)}
-                  className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedTip === i ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'}`}
-                >
+                <button key={i} onClick={() => setSelectedTip(i)} className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold ${selectedTip === i ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'}`}>
                   {tip.icon} {tip.title.split(' ')[0]}
                 </button>
               ))}
             </div>
-            <div className="bg-gray-50 rounded-2xl p-4">
-              <h3 className="font-black text-gray-900 mb-3">{SAFETY_TIPS[selectedTip].icon} {SAFETY_TIPS[selectedTip].title}</h3>
-              <ol className="flex flex-col gap-3">
-                {SAFETY_TIPS[selectedTip].tips.map((tip, i) => (
-                  <li key={i} className="flex gap-3 items-start">
-                    <span className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-xs font-black shrink-0 mt-0.5">{i + 1}</span>
-                    <p className="text-sm text-gray-700 font-medium leading-relaxed">{tip}</p>
-                  </li>
-                ))}
-              </ol>
+            <div className="bg-slate-50 rounded-2xl p-4">
+              <h3 className="font-bold text-slate-800 mb-2">{SAFETY_TIPS[selectedTip].icon} {SAFETY_TIPS[selectedTip].title}</h3>
+              {SAFETY_TIPS[selectedTip].tips.map((t, i) => (
+                <p key={i} className="text-sm text-slate-600 mb-1.5"><span className="font-bold text-primary">{i+1}.</span> {t}</p>
+              ))}
             </div>
-            <button
-              onClick={() => { setShowSafetyTips(false); setShowTrigger(true); }}
-              className="w-full mt-4 bg-primary text-white py-4 rounded-2xl font-black tap-effect"
-            >
-              🚨 Trigger Emergency Alert
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Hospitals Modal */}
-      {showHospitals && (
-        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-end p-4">
-          <div className="w-full bg-white rounded-3xl p-6 max-h-[80vh] overflow-y-auto no-scrollbar animate-in slide-in-from-bottom-10 duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-black text-gray-900">Nearby Hospitals</h2>
-              <button onClick={() => setShowHospitals(false)} className="p-2 bg-gray-100 rounded-full text-gray-500">
-                <X size={20} />
-              </button>
-            </div>
-            {[
-              { name: 'AIIMS Trauma Centre', dist: '1.2 km', phone: '011-26588500', type: 'Government', rating: 4.8 },
-              { name: 'Ram Manohar Lohia Hospital', dist: '2.1 km', phone: '011-23404323', type: 'Government', rating: 4.5 },
-              { name: 'Safdarjung Hospital', dist: '3.0 km', phone: '011-26707444', type: 'Government', rating: 4.3 },
-              { name: 'Apollo Hospital Delhi', dist: '3.8 km', phone: '011-71791090', type: 'Private', rating: 4.7 },
-              { name: 'Max Super Speciality', dist: '4.5 km', phone: '011-26515050', type: 'Private', rating: 4.6 },
-            ].map((h, i) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100 mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center text-lg">🏥</div>
-                  <div>
-                    <p className="font-bold text-gray-900 text-sm">{h.name}</p>
-                    <p className="text-xs text-gray-400">{h.dist} away • ⭐ {h.rating} • {h.type}</p>
-                  </div>
-                </div>
-                <a href={`tel:${h.phone}`} className="bg-primary text-white px-3 py-1.5 rounded-xl text-xs font-bold tap-effect">
-                  Call
-                </a>
-              </div>
-            ))}
-            <Link href="/map" onClick={() => setShowHospitals(false)} className="w-full mt-2 bg-gray-100 text-gray-700 py-3 rounded-2xl font-bold text-sm flex items-center justify-center tap-effect">
-              View on Map
-            </Link>
           </div>
         </div>
       )}

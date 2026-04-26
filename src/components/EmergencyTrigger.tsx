@@ -6,6 +6,8 @@ import { analyzeEmergencyImage, classifyEmergency, AIDetectionResult } from '@/l
 import { useAppStore } from '@/lib/store';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { createAlert } from '@/lib/alertService';
+import { AlertDoc } from '@/lib/types';
 import { canTriggerAlert, canCallAI, incrementAlertCount, incrementAICount, setDebugField, debugLog, debugError, DEBUG } from '@/lib/debug';
 
 interface EmergencyTriggerProps {
@@ -16,9 +18,10 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
   const [step, setStep] = useState<'selecting' | 'text' | 'recording' | 'processing' | 'confirming'>('selecting');
   const [recordTime, setRecordTime] = useState(0);
   const [aiResult, setAiResult] = useState<AIDetectionResult | null>(null);
-  const [processingStep, setProcessingStep] = useState('Listening to voice...');
+  const [processingStep, setProcessingStep] = useState('Listening...');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [textInput, setTextInput] = useState('');
+  const [isDispatching, setIsDispatching] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setActiveAlert, currentUser } = useAppStore();
   const router = useRouter();
@@ -32,184 +35,146 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
     return () => clearInterval(interval);
   }, [step]);
 
-  // ── Rate Limit Check ──
   const checkRateLimits = (): boolean => {
-    if (!canTriggerAlert()) {
-      toast.error('⚠️ Rate Limit: Max 3 alerts per session reached.');
-      return false;
-    }
-    if (!canCallAI()) {
-      toast.error('⚠️ Rate Limit: Max 10 AI calls per session reached.');
-      return false;
-    }
+    if (!canTriggerAlert()) { toast.error('Rate limit: Max 3 alerts per session.'); return false; }
+    if (!canCallAI()) { toast.error('Rate limit: Max 10 AI calls per session.'); return false; }
     return true;
   };
 
-  // ── Voice Recording via Web Speech API ──
+  // ── Voice ──
   const handleStartRecording = () => {
     if (!checkRateLimits()) return;
     setStep('recording');
     setRecordTime(0);
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { toast.error('Speech not supported. Use text input.'); setStep('text'); return; }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast.error('🎤 Speech Recognition not supported. Use text or image input.');
-      if (DEBUG) debugError('Speech', 'Web Speech API not available');
-      setStep('text'); // Fallback to text input
-      return;
-    }
+    const rec = new SR();
+    recognitionRef.current = rec;
+    rec.lang = 'en-US';
+    rec.continuous = true;
+    rec.interimResults = true;
+    let final = '';
+    let done = false;
 
-    const recognition = new SpeechRecognition();
-    recognitionRef.current = recognition;
-    recognition.lang = 'en-US';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    let finalTranscript = '';
-    let isProcessed = false;
-
-    recognition.onresult = (e: any) => {
+    rec.onresult = (e: any) => {
       for (let i = e.resultIndex; i < e.results.length; ++i) {
-        if (e.results[i].isFinal) {
-          finalTranscript += e.results[i][0].transcript + ' ';
-        }
+        if (e.results[i].isFinal) final += e.results[i][0].transcript + ' ';
       }
     };
-
-    recognition.onerror = (e: any) => {
-      debugError('Speech', 'Recognition error:', e.error);
-      if (DEBUG) toast.error(`🎤 Speech API Error: ${e.error}`);
-      if (isProcessed) return;
-      isProcessed = true;
-      setStep('text'); // Fallback to text
+    rec.onerror = (e: any) => {
+      debugError('Speech', e.error);
+      if (DEBUG) toast.error(`Speech error: ${e.error}`);
+      if (!done) { done = true; setStep('text'); }
     };
-
-    recognition.onend = () => {
-      if (isProcessed) return;
-      isProcessed = true;
-      const transcript = finalTranscript.trim();
-      if (transcript) {
-        debugLog('Speech', 'Transcript:', transcript);
-        handleProcess(transcript);
-      } else {
-        toast.error('🎤 No speech detected. Try text input.');
-        setStep('text');
-      }
+    rec.onend = () => {
+      if (done) return;
+      done = true;
+      const t = final.trim();
+      if (t) { debugLog('Speech', t); handleProcess(t); }
+      else { toast.error('No speech detected.'); setStep('text'); }
     };
-
-    try {
-      recognition.start();
-      debugLog('Speech', 'Recording started');
-    } catch (err) {
-      debugError('Speech', 'Failed to start:', err);
-      if (DEBUG) toast.error('🎤 Microphone access failed.');
-      setStep('text');
-    }
-
-    // Auto-stop after 8 seconds
-    setTimeout(() => {
-      try { if (recognitionRef.current) recognitionRef.current.stop(); } catch {}
-    }, 8000);
+    try { rec.start(); } catch { setStep('text'); }
+    setTimeout(() => { try { rec?.stop(); } catch {} }, 8000);
   };
 
-  const handleStopRecording = () => {
-    try { if (recognitionRef.current) recognitionRef.current.stop(); } catch {}
-  };
+  const handleStopRecording = () => { try { recognitionRef.current?.stop(); } catch {} };
 
-  // ── Text Submit ──
+  // ── Text ──
   const handleTextSubmit = () => {
-    if (!textInput.trim()) {
-      toast.error('Please describe your emergency.');
-      return;
-    }
+    if (!textInput.trim()) { toast.error('Describe your emergency.'); return; }
     if (!checkRateLimits()) return;
-    debugLog('Text', 'Submitted:', textInput);
     handleProcess(textInput.trim());
   };
 
-  // ── Image Upload ──
+  // ── Image ──
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!checkRateLimits()) return;
-
+    if (!file || !checkRateLimits()) return;
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const base64 = ev.target?.result as string;
       setImagePreview(base64);
       setStep('processing');
-      setProcessingStep('Analyzing scene with Gemini Vision...');
-
+      setProcessingStep('Analyzing with Gemini Vision...');
       try {
         incrementAICount();
         const labels = await analyzeEmergencyImage(base64);
-        debugLog('Vision', 'Labels:', labels);
+        debugLog('Vision', labels);
         setDebugField({ ai: 'ACTIVE' });
-
-        setProcessingStep('Classifying emergency with AI...');
+        setProcessingStep('Classifying emergency...');
         incrementAICount();
-        const result = await classifyEmergency('Image-based emergency report', labels);
-        debugLog('Classify', 'Result:', result);
+        const result = await classifyEmergency('Image-based emergency', labels);
         setAiResult(result);
         setStep('confirming');
       } catch (err) {
-        debugError('Vision', 'Image analysis failed:', err);
+        debugError('Vision', err);
         setDebugField({ ai: 'FAILED' });
-        toast.error('❌ Vision API failed. Please try text or voice input.');
+        toast.error('❌ Vision API failed.');
         setStep('selecting');
       }
     };
     reader.readAsDataURL(file);
   };
 
-  // ── Main AI Processing Pipeline ──
+  // ── AI Pipeline ──
   const handleProcess = async (transcript: string) => {
     setStep('processing');
-    setProcessingStep('Classifying emergency with AI...');
-
+    setProcessingStep('Classifying emergency...');
     try {
       incrementAICount();
       const result = await classifyEmergency(transcript, ['Distress', 'Voice Command']);
-      debugLog('Classify', 'Result:', result);
+      debugLog('Classify', result);
       setDebugField({ ai: 'ACTIVE' });
       setAiResult(result);
       setStep('confirming');
     } catch (error) {
-      debugError('Classify', 'AI processing failed:', error);
+      debugError('Classify', error);
       setDebugField({ ai: 'FAILED' });
-      toast.error('❌ AI Processing Failed. Check console for details.');
+      toast.error('❌ AI Processing Failed.');
       setStep('selecting');
     }
   };
 
-  // ── Confirm & Create Alert ──
-  const handleConfirm = () => {
-    if (!aiResult) return;
+  // ── Confirm & Write to Firestore ──
+  const handleConfirm = async () => {
+    if (!aiResult || isDispatching) return;
+    setIsDispatching(true);
 
-    incrementAlertCount();
-
-    const newAlert = {
-      id: 'alert-' + Date.now(),
+    const alertId = 'alert-' + Date.now();
+    const alertDoc: AlertDoc = {
+      id: alertId,
       userId: currentUser?.id || 'guest',
+      userName: currentUser?.username || 'Unknown',
       type: aiResult.emergencyType,
-      status: 'pending' as any,
-      severity: aiResult.severity.toLowerCase() as any,
-      userLocation: currentUser?.location || { lat: 28.6139, lng: 77.2090, address: 'Current Location' },
-      createdAt: new Date().toISOString(),
+      severity: aiResult.severity,
+      status: 'pending',
+      confidence: aiResult.confidence,
+      reason: aiResult.reason,
+      instructions: aiResult.instructions,
+      userLocation: currentUser?.location
+        ? { lat: currentUser.location.lat, lng: currentUser.location.lng, address: currentUser.location.address }
+        : { lat: 28.6139, lng: 77.2090, address: 'Unknown' },
+      createdAt: Date.now(),
     };
 
-    setActiveAlert(newAlert);
-    toast.success(`🚨 ${aiResult.emergencyType} reported. Help is on the way!`);
-    onClose();
-    router.push('/active');
+    try {
+      await createAlert(alertDoc);
+      incrementAlertCount();
+      setActiveAlert(alertDoc);
+      toast.success(`🚨 ${aiResult.emergencyType} reported. Waiting for responder...`);
+      onClose();
+      router.push('/active');
+    } catch (err) {
+      debugError('Dispatch', err);
+      toast.error('Failed to dispatch alert. Check connection.');
+      setIsDispatching(false);
+    }
   };
 
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60).toString().padStart(2, '0');
-    const sec = (s % 60).toString().padStart(2, '0');
-    return `${m}:${sec}`;
-  };
+  const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
-  const severityColor = {
+  const sevColor: Record<string, string> = {
     LOW: 'bg-yellow-100 text-yellow-700',
     MEDIUM: 'bg-orange-100 text-orange-600',
     HIGH: 'bg-red-100 text-red-600',
@@ -217,176 +182,98 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/92 backdrop-blur-xl flex flex-col p-8 animate-in fade-in duration-300">
-      <button onClick={onClose} className="absolute top-8 right-8 text-white/50 hover:text-white transition-colors z-10">
-        <X size={32} />
-      </button>
-
-      {/* Hidden file input */}
+    <div className="fixed inset-0 z-[100] bg-black/92 backdrop-blur-xl flex flex-col p-6 animate-in fade-in duration-300">
+      <button onClick={onClose} className="absolute top-6 right-6 text-white/50 hover:text-white z-10"><X size={28} /></button>
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageUpload} />
 
       <div className="flex-1 flex flex-col justify-center items-center text-center">
 
-        {/* ── STEP 1: Select Mode ── */}
         {step === 'selecting' && (
-          <div className="flex flex-col items-center gap-8 animate-in zoom-in-95 duration-500">
-            <div className="w-32 h-32 bg-primary rounded-full flex items-center justify-center shadow-2xl shadow-primary/40 pulse-red">
-              <ShieldAlert size={64} className="text-white" />
+          <div className="flex flex-col items-center gap-6 animate-in zoom-in-95 duration-500">
+            <div className="w-28 h-28 bg-gradient-to-br from-primary to-indigo-600 rounded-full flex items-center justify-center shadow-2xl shadow-primary/30 pulse-red">
+              <ShieldAlert size={52} className="text-white" />
             </div>
             <div>
-              <h2 className="text-3xl font-black text-white mb-2">Emergency Trigger</h2>
-              <p className="text-white/60">Choose your input method for AI detection</p>
+              <h2 className="text-2xl font-bold text-white mb-1">Report Emergency</h2>
+              <p className="text-white/50 text-sm">Choose input method</p>
             </div>
-
-            <div className="flex gap-4 w-full max-w-sm flex-wrap justify-center">
-              <button
-                onClick={handleStartRecording}
-                className="flex-1 min-w-[100px] bg-white/10 hover:bg-white/20 border border-white/10 py-6 rounded-3xl flex flex-col items-center gap-3 transition-all tap-effect active:scale-95"
-              >
-                <div className="p-4 bg-primary/20 rounded-2xl text-primary"><Mic size={28} /></div>
-                <span className="text-sm font-bold text-white uppercase tracking-widest">Voice</span>
-                <span className="text-[10px] text-white/40">Speak it</span>
-              </button>
-              <button
-                onClick={() => setStep('text')}
-                className="flex-1 min-w-[100px] bg-white/10 hover:bg-white/20 border border-white/10 py-6 rounded-3xl flex flex-col items-center gap-3 transition-all tap-effect active:scale-95"
-              >
-                <div className="p-4 bg-emerald-500/20 rounded-2xl text-emerald-400"><Type size={28} /></div>
-                <span className="text-sm font-bold text-white uppercase tracking-widest">Text</span>
-                <span className="text-[10px] text-white/40">Type it</span>
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1 min-w-[100px] bg-white/10 hover:bg-white/20 border border-white/10 py-6 rounded-3xl flex flex-col items-center gap-3 transition-all tap-effect active:scale-95"
-              >
-                <div className="p-4 bg-blue-500/20 rounded-2xl text-blue-400"><Camera size={28} /></div>
-                <span className="text-sm font-bold text-white uppercase tracking-widest">Image</span>
-                <span className="text-[10px] text-white/40">Snap it</span>
-              </button>
+            <div className="flex gap-3 w-full max-w-xs">
+              {[
+                { icon: Mic, label: 'Voice', sub: 'Speak', color: 'bg-primary/20 text-primary', onClick: handleStartRecording },
+                { icon: Type, label: 'Text', sub: 'Type', color: 'bg-emerald-500/20 text-emerald-400', onClick: () => setStep('text') },
+                { icon: Camera, label: 'Image', sub: 'Photo', color: 'bg-blue-500/20 text-blue-400', onClick: () => fileInputRef.current?.click() },
+              ].map((m) => (
+                <button key={m.label} onClick={m.onClick} className="flex-1 bg-white/8 hover:bg-white/15 border border-white/10 py-5 rounded-2xl flex flex-col items-center gap-2 transition-all active:scale-95">
+                  <div className={`p-3 rounded-xl ${m.color}`}><m.icon size={24} /></div>
+                  <span className="text-xs font-bold text-white">{m.label}</span>
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        {/* ── STEP: Text Input ── */}
         {step === 'text' && (
-          <div className="flex flex-col items-center gap-6 w-full max-w-sm animate-in zoom-in-95 duration-300">
-            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center">
-              <Type size={40} className="text-emerald-400" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-white mb-1">Describe Your Emergency</h2>
-              <p className="text-white/40 text-sm">Be specific: what happened, injuries, location details</p>
-            </div>
-            <textarea
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              placeholder='e.g. "There is a fire in my building, 3rd floor. Smoke everywhere."'
-              className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-2xl px-4 py-4 outline-none focus:border-emerald-500/50 resize-none h-32 placeholder:text-white/20"
-            />
+          <div className="flex flex-col items-center gap-5 w-full max-w-sm animate-in zoom-in-95 duration-300">
+            <Type size={36} className="text-emerald-400" />
+            <h2 className="text-xl font-bold text-white">Describe Emergency</h2>
+            <textarea value={textInput} onChange={(e) => setTextInput(e.target.value)} placeholder='e.g. "Fire in building, 3rd floor"' className="w-full bg-white/5 border border-white/10 text-white text-sm rounded-2xl px-4 py-4 outline-none focus:border-emerald-500/50 resize-none h-28 placeholder:text-white/20" />
             <div className="flex gap-3 w-full">
-              <button onClick={() => setStep('selecting')} className="flex-1 bg-white/10 text-white py-3 rounded-xl font-bold text-sm">Back</button>
-              <button onClick={handleTextSubmit} disabled={!textInput.trim()} className="flex-1 bg-emerald-500 disabled:opacity-40 text-white py-3 rounded-xl font-black text-sm active:scale-95 transition-all">Analyze</button>
+              <button onClick={() => setStep('selecting')} className="flex-1 bg-white/10 text-white py-3 rounded-xl font-semibold text-sm">Back</button>
+              <button onClick={handleTextSubmit} disabled={!textInput.trim()} className="flex-1 bg-emerald-500 disabled:opacity-40 text-white py-3 rounded-xl font-bold text-sm active:scale-95 transition-all">Analyze</button>
             </div>
           </div>
         )}
 
-        {/* ── STEP: Recording ── */}
         {step === 'recording' && (
-          <div className="flex flex-col items-center gap-8">
-            <div className="relative">
-              <div className="w-36 h-36 bg-primary/20 rounded-full flex items-center justify-center animate-ping absolute inset-0" />
-              <div className="w-36 h-36 bg-primary rounded-full flex items-center justify-center relative z-10 shadow-2xl shadow-primary/50">
-                <Mic size={52} className="text-white" />
-              </div>
-            </div>
-            <div className="text-center">
-              <h2 className="text-5xl font-black text-white mb-2 tabular-nums tracking-tight">{formatTime(recordTime)}</h2>
-              <p className="text-primary font-black uppercase tracking-widest animate-pulse flex items-center gap-2 justify-center">
-                <Radio size={14} /> Recording distress call...
-              </p>
-              <p className="text-white/30 text-xs mt-2">Auto-stops at 8s • Web Speech API</p>
-            </div>
-            <button onClick={handleStopRecording} className="px-8 py-3 bg-white/10 border border-white/20 rounded-2xl text-white font-bold hover:bg-white/20 transition-all">
-              Stop &amp; Analyze
-            </button>
-          </div>
-        )}
-
-        {/* ── STEP: Processing ── */}
-        {step === 'processing' && (
           <div className="flex flex-col items-center gap-6">
-            {imagePreview && (
-              <div className="w-40 h-40 rounded-2xl overflow-hidden border-2 border-primary/40 mb-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imagePreview} alt="Scene" className="w-full h-full object-cover" />
-              </div>
-            )}
-            <Loader2 size={64} className="text-primary animate-spin" />
-            <div className="text-center">
-              <h2 className="text-2xl font-black text-white mb-1">AI Analyzing Scene</h2>
-              <p className="text-white/40 font-medium animate-pulse">{processingStep}</p>
-              <div className="flex gap-1.5 justify-center mt-4">
-                {['Gemini', 'Grok-4', 'SerpAPI'].map((api, i) => (
-                  <span key={api} className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${i === 0 ? 'bg-blue-500/20 text-blue-400' : i === 1 ? 'bg-purple-500/20 text-purple-400' : 'bg-green-500/20 text-green-400'}`}>
-                    {api}
-                  </span>
-                ))}
-              </div>
+            <div className="relative">
+              <div className="w-32 h-32 bg-primary/20 rounded-full animate-ping absolute inset-0" />
+              <div className="w-32 h-32 bg-gradient-to-br from-primary to-indigo-600 rounded-full flex items-center justify-center relative z-10 shadow-2xl"><Mic size={48} className="text-white" /></div>
             </div>
+            <h2 className="text-4xl font-bold text-white tabular-nums">{formatTime(recordTime)}</h2>
+            <p className="text-primary font-bold uppercase tracking-widest animate-pulse text-sm flex items-center gap-2"><Radio size={12} /> Recording...</p>
+            <button onClick={handleStopRecording} className="px-6 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white font-semibold text-sm">Stop & Analyze</button>
           </div>
         )}
 
-        {/* ── STEP: Confirm ── */}
+        {step === 'processing' && (
+          <div className="flex flex-col items-center gap-5">
+            {imagePreview && <div className="w-36 h-36 rounded-2xl overflow-hidden border-2 border-primary/30"><img src={imagePreview} alt="Scene" className="w-full h-full object-cover" /></div>}
+            <Loader2 size={52} className="text-primary animate-spin" />
+            <h2 className="text-xl font-bold text-white">AI Analyzing</h2>
+            <p className="text-white/40 text-sm animate-pulse">{processingStep}</p>
+          </div>
+        )}
+
         {step === 'confirming' && aiResult && (
-          <div className="w-full max-w-sm bg-white rounded-[32px] p-8 animate-in slide-in-from-bottom-10 duration-500">
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 ${severityColor[aiResult.severity]}`}>
-              <AlertCircle size={32} />
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 animate-in slide-in-from-bottom-10 duration-500">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${sevColor[aiResult.severity] || 'bg-gray-100'}`}>
+              <AlertCircle size={28} />
             </div>
-
-            <h2 className="text-2xl font-black text-gray-900 mb-2">{aiResult.emergencyType}</h2>
-
-            <div className="flex items-center gap-2 mb-4">
-              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${severityColor[aiResult.severity]}`}>
-                {aiResult.severity} SEVERITY
-              </span>
-              <span className="text-xs font-bold text-gray-400">{aiResult.confidence}% confidence</span>
+            <h2 className="text-xl font-bold text-slate-900 mb-1">{aiResult.emergencyType}</h2>
+            <div className="flex items-center gap-2 mb-3">
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${sevColor[aiResult.severity] || ''}`}>{aiResult.severity}</span>
+              <span className="text-xs text-slate-400">{aiResult.confidence}% confidence</span>
             </div>
-
-            <p className="text-gray-500 text-sm leading-relaxed mb-4">{aiResult.reason}</p>
-
-            <div className="bg-amber-50 rounded-2xl p-4 mb-6">
-              <p className="text-xs font-black text-amber-700 uppercase mb-2">⚡ Immediate Instructions</p>
-              <ol className="flex flex-col gap-1.5">
-                {aiResult.instructions.map((inst, i) => (
-                  <li key={i} className="text-xs text-amber-900 flex gap-2">
-                    <span className="font-black text-amber-600 shrink-0">{i + 1}.</span>
-                    {inst}
-                  </li>
-                ))}
-              </ol>
+            <p className="text-slate-500 text-sm mb-3">{aiResult.reason}</p>
+            <div className="bg-amber-50 rounded-xl p-3 mb-5">
+              <p className="text-[10px] font-bold text-amber-700 uppercase mb-1.5">Safety Instructions</p>
+              {aiResult.instructions.map((inst, i) => (
+                <p key={i} className="text-xs text-amber-900 mb-1"><span className="font-bold text-amber-600">{i+1}.</span> {inst}</p>
+              ))}
             </div>
-
-            <p className="text-sm font-bold text-gray-900 mb-4 text-center">Should we dispatch help now?</p>
-
-            <div className="flex flex-col gap-3">
-              <button onClick={handleConfirm} className="w-full bg-primary text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 tap-effect active:scale-95">
-                <Check size={20} /> YES, DISPATCH HELP
-              </button>
-              <button onClick={onClose} className="w-full bg-gray-100 text-gray-400 py-4 rounded-2xl font-bold tap-effect">
-                CANCEL
-              </button>
-            </div>
+            <button onClick={handleConfirm} disabled={isDispatching} className="w-full bg-gradient-to-r from-primary to-indigo-600 text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 transition-all">
+              {isDispatching ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+              {isDispatching ? 'Dispatching...' : 'DISPATCH HELP'}
+            </button>
+            <button onClick={onClose} className="w-full bg-slate-100 text-slate-400 py-3 rounded-xl font-semibold mt-2 text-sm">Cancel</button>
           </div>
         )}
       </div>
 
       <style jsx>{`
         .pulse-red { animation: pulse-red 2s infinite; }
-        @keyframes pulse-red {
-          0% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.4); }
-          70% { box-shadow: 0 0 0 24px rgba(229, 57, 53, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(229, 57, 53, 0); }
-        }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.4); } 70% { box-shadow: 0 0 0 20px rgba(37,99,235,0); } 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); } }
       `}</style>
     </div>
   );
