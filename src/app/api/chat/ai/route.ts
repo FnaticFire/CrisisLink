@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const { message, emergencyType } = await request.json();
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: 'AI API Key not configured on server' }, { status: 500 });
     }

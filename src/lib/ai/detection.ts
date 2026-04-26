@@ -66,13 +66,6 @@ export function transcribeAudio(_blob: Blob): Promise<string> {
 // 2. IMAGE ANALYSIS via Gemini Vision API
 // ─────────────────────────────────────────────
 export async function analyzeEmergencyImage(imageBase64: string): Promise<string[]> {
-  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-
-  if (!apiKey) {
-    console.warn('[Vision] No API key; using mock labels.');
-    return ['Fire', 'Smoke', 'Emergency', 'Indoor'];
-  }
-
   try {
     const response = await fetch('/api/vision', {
       method: 'POST',
@@ -122,30 +115,6 @@ export async function classifyEmergency(
     throw new Error('Invalid Data from Server');
   } catch (error: any) {
     debugError('Triage-Server-Failed', error);
-    
-    // SECOND FALLBACK: Direct Client-to-Gemini Fetch (as suggested by user)
-    try {
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      const directResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `Classify emergency and return JSON only: { "emergencyType": "", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "confidence": 0, "reason": "", "instructions": [] } \n\nUser input: ${transcript}` }] }]
-          })
-        }
-      );
-      if (directResponse.ok) {
-        const d = await directResponse.json();
-        const t = d?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const m = t.match(/\{[\s\S]*\}/);
-        if (m) return JSON.parse(m[0]);
-      }
-    } catch (e2) {
-      debugError('Triage-Direct-Failed', e2);
-    }
-
     toast.error('AI Classifier Unavailable. Using rule-based triage.');
     return ruleBasedFallback(transcript, labels);
   }
