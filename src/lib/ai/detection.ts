@@ -80,7 +80,7 @@ export async function analyzeEmergencyImage(imageBase64: string): Promise<string
       ? imageBase64.split(',')[1]
       : imageBase64;
 
-    const models = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+    const models = ['gemini-2.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'];
     let data;
     
     for (const model of models) {
