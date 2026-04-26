@@ -9,7 +9,7 @@ import { toast } from 'react-hot-toast';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { listenToAlert, haversineKm, resolveAlertInDB, getEmergencyNumber } from '@/lib/alertService';
 import { AlertDoc } from '@/lib/types';
-import { debugLog, debugError, DEBUG } from '@/lib/debug';
+import { debugLog, debugError, DEBUG, setDebugField } from '@/lib/debug';
 
 const MapComponent = dynamic(() => import('@/components/MapComponent'), { ssr: false });
 
@@ -105,18 +105,27 @@ export default function ActiveEmergencyPage() {
 
     try {
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      if (!apiKey) throw new Error('No API key');
+      if (!apiKey) throw new Error('NEXT_PUBLIC_GEMINI_API_KEY not set');
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       const result = await model.generateContent(
-        `User is in a ${alert.type} emergency. They say: "${msg}". Give 1-2 sentence actionable safety advice. Be concise.`
+        `You are CrisisLink AI, an emergency safety advisor. The user is currently in an active "${alert.type}" emergency (severity: ${alert.severity}). They say: "${msg}". Respond with 1-2 sentences of actionable, specific safety advice. Do NOT repeat generic platitudes. Be specific to their message.`
       );
       const text = result.response.text();
       debugLog('AI-Chat', text);
+      setDebugField({ ai: 'ACTIVE' });
       setMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text }]);
-    } catch (err) {
+    } catch (err: any) {
       debugError('AI-Chat', err);
-      setMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text: 'Stay safe. Help is being dispatched.' }]);
+      setDebugField({ ai: 'FAILED' });
+      if (DEBUG) toast.error(`AI Chat Error: ${err.message || 'Unknown'}`);
+      // Contextual fallback based on emergency type
+      const type = (alert.type || '').toLowerCase();
+      let fallback = 'Stay in a safe location. Help is being dispatched to you.';
+      if (type.includes('fire')) fallback = 'Stay low below smoke level. Cover your mouth with a wet cloth and move toward the nearest exit.';
+      else if (type.includes('medical')) fallback = 'Keep the patient still and comfortable. Do not give food or water. Monitor their breathing.';
+      else if (type.includes('violence')) fallback = 'Stay hidden and silent. Do not engage. Call 100 when safe.';
+      setMessages(prev => [...prev.slice(0, -1), { sender: 'ai', text: fallback }]);
     }
   };
 

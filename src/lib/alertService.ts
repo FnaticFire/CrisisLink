@@ -5,14 +5,13 @@
 
 import { db } from './firebase';
 import {
-  collection, doc, setDoc, getDoc, getDocs, updateDoc,
-  onSnapshot, query, where, orderBy, limit, serverTimestamp, Unsubscribe
+  collection, doc, setDoc, getDocs, updateDoc,
+  onSnapshot, query, where, limit, Unsubscribe
 } from 'firebase/firestore';
 import { AlertDoc, UserDoc } from './types';
 import { debugLog, debugError } from './debug';
 
 const ALERTS_COL = 'alerts';
-const USERS_COL = 'users';
 
 // ─── Create Alert in Firestore ───
 export async function createAlert(alert: AlertDoc): Promise<string> {
@@ -28,18 +27,20 @@ export async function createAlert(alert: AlertDoc): Promise<string> {
 }
 
 // ─── Get active alert for a user (civilian) ───
+// Uses simple query without orderBy to avoid needing composite index
 export async function getMyActiveAlert(userId: string): Promise<AlertDoc | null> {
   try {
     const q = query(
       collection(db, ALERTS_COL),
       where('userId', '==', userId),
-      where('status', 'in', ['pending', 'accepted', 'en_route']),
-      orderBy('createdAt', 'desc'),
-      limit(1)
+      where('status', 'in', ['pending', 'accepted', 'en_route'])
     );
     const snap = await getDocs(q);
     if (!snap.empty) {
-      return snap.docs[0].data() as AlertDoc;
+      // Sort client-side to get the most recent
+      const alerts = snap.docs.map(d => d.data() as AlertDoc);
+      alerts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return alerts[0];
     }
     return null;
   } catch (err) {
@@ -48,21 +49,23 @@ export async function getMyActiveAlert(userId: string): Promise<AlertDoc | null>
   }
 }
 
-// ─── Get all pending alerts (for responders) ───
-export async function getPendingAlerts(): Promise<AlertDoc[]> {
-  try {
-    const q = query(
-      collection(db, ALERTS_COL),
-      where('status', '==', 'pending'),
-      orderBy('createdAt', 'desc'),
-      limit(20)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => d.data() as AlertDoc);
-  } catch (err) {
-    debugError('Firestore', 'getPendingAlerts failed:', err);
-    return [];
-  }
+// ─── Real-time listener for ALL non-resolved alerts ───
+// NO orderBy — avoids composite index requirement. Sort client-side.
+export function listenToPendingAlerts(callback: (alerts: AlertDoc[]) => void): Unsubscribe {
+  // Listen to ALL alerts and filter client-side to avoid composite index issues
+  const colRef = collection(db, ALERTS_COL);
+  return onSnapshot(colRef, (snap) => {
+    const all = snap.docs.map(d => d.data() as AlertDoc);
+    // Filter to non-resolved only
+    const active = all.filter(a => a.status !== 'resolved');
+    // Sort by createdAt descending
+    active.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    debugLog('Firestore', `listenToPendingAlerts: ${active.length} active alerts found`);
+    callback(active);
+  }, (err) => {
+    debugError('Firestore', 'listenToPendingAlerts error:', err);
+    callback([]);
+  });
 }
 
 // ─── Responder accepts an alert ───
@@ -122,23 +125,6 @@ export function listenToAlert(alertId: string, callback: (alert: AlertDoc | null
   }, (err) => {
     debugError('Firestore', 'listenToAlert error:', err);
     callback(null);
-  });
-}
-
-// ─── Real-time listener for pending alerts (responder dashboard) ───
-export function listenToPendingAlerts(callback: (alerts: AlertDoc[]) => void): Unsubscribe {
-  const q = query(
-    collection(db, ALERTS_COL),
-    where('status', 'in', ['pending', 'accepted', 'en_route']),
-    orderBy('createdAt', 'desc'),
-    limit(20)
-  );
-  return onSnapshot(q, (snap) => {
-    const alerts = snap.docs.map(d => d.data() as AlertDoc);
-    callback(alerts);
-  }, (err) => {
-    debugError('Firestore', 'listenToPendingAlerts error:', err);
-    callback([]);
   });
 }
 

@@ -108,8 +108,24 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
           key={place.id} 
           position={[place.lat, place.lng]} 
           icon={recommendationIcon(place.type)}
-        />
+        >
+          <Popup>
+            <div className="font-bold text-xs">{place.name}</div>
+            <div className="text-[10px] text-gray-500">{place.distance} • ⭐ {place.rating}</div>
+          </Popup>
+        </Marker>
       ))}
+
+      {/* Responder tracking position */}
+      {trackingPos && (
+        <Marker position={trackingPos} icon={typeof window !== 'undefined' ? L.divIcon({
+          className: 'responder-marker',
+          html: '<div style="width:28px;height:28px;background:linear-gradient(135deg,#10B981,#059669);border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(16,185,129,0.5);display:flex;align-items:center;justify-content:center;font-size:12px;">🚗</div>',
+          iconSize: [28, 28],
+        }) : undefined}>
+          <Popup>Responder en route</Popup>
+        </Marker>
+      )}
 
       <RecenterMap lat={center[0]} lng={center[1]} />
       
