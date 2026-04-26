@@ -121,9 +121,9 @@ export default function ActiveEmergencyPage() {
       }
       
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
       const result = await model.generateContent(
-        `You are CrisisLink AI, an emergency safety advisor. The user is in an active "${alert.type}" emergency (severity: ${alert.severity}). They say: "${msg}". Respond with 1-2 sentences of actionable, specific safety advice.`
+        `You are CrisisLink AI (using Gemini 2.5 Flash-Lite), an emergency safety advisor. The user is in an active "${alert.type}" emergency (severity: ${alert.severity}). They say: "${msg}". Respond with 1-2 sentences of actionable, specific safety advice.`
       );
       const text = result.response.text();
       debugLog('AI-Chat', text);
