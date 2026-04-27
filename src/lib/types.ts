@@ -44,6 +44,8 @@ export interface AlertDoc {
   trafficResponderId?: string;
   trafficResponderName?: string;
   greenCorridorLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'MAX';
+  hospitalName?: string;
+  hospitalLocation?: { lat: number; lng: number };
 }
 
 export interface ChatMessageDoc {

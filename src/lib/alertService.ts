@@ -54,14 +54,25 @@ export async function getMyActiveAlert(userId: string): Promise<AlertDoc | null>
 // ─── Get resolved alerts for history ───
 export async function getResolvedAlerts(userId: string): Promise<AlertDoc[]> {
   try {
-    const q = query(
+    // Fetch alerts where user was survivor
+    const q1 = query(
       collection(db, ALERTS_COL),
       where('userId', '==', userId),
       where('status', '==', 'resolved'),
       limit(20)
     );
-    const snap = await getDocs(q);
-    const alerts = snap.docs.map(d => d.data() as AlertDoc);
+    // Fetch alerts where user was responder
+    const q2 = query(
+      collection(db, ALERTS_COL),
+      where('responderId', '==', userId),
+      where('status', '==', 'resolved'),
+      limit(20)
+    );
+    const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+    const alerts = [
+      ...snap1.docs.map(d => d.data() as AlertDoc),
+      ...snap2.docs.map(d => d.data() as AlertDoc)
+    ];
     alerts.sort((a, b) => (b.resolvedAt || 0) - (a.resolvedAt || 0));
     return alerts;
   } catch (err) {
@@ -143,6 +154,18 @@ export async function updateResponderLocation(alertId: string, lat: number, lng:
     });
   } catch (err) {
     debugError('Firestore', 'updateResponderLocation failed:', err);
+  }
+}
+
+export async function setHospitalDestination(alertId: string, hName: string, lat: number, lng: number): Promise<void> {
+  try {
+    const ref = doc(db, ALERTS_COL, alertId);
+    await updateDoc(ref, {
+      hospitalName: hName,
+      hospitalLocation: { lat, lng }
+    });
+  } catch (err) {
+    debugError('Firestore', 'setHospitalDestination failed:', err);
   }
 }
 

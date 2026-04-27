@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
-import { X, Send, Navigation, CheckCircle2, MessageSquare, Radio, Phone, Loader2, Shield } from 'lucide-react';
+import { X, Send, Navigation, CheckCircle2, MessageSquare, Radio, Phone, Loader2, Shield, Hospital, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { listenToAlert, haversineKm, resolveAlertInDB, getEmergencyNumber } from '@/lib/alertService';
@@ -260,9 +260,17 @@ export default function ActiveEmergencyPage() {
             </div>
           )}
           {alert.trafficSupport && (
-            <div className="bg-emerald-600/90 backdrop-blur px-3 py-1.5 rounded-xl border border-emerald-400/30 flex items-center gap-1.5 animate-pulse">
+            <div className={`bg-emerald-600/90 backdrop-blur px-3 py-1.5 rounded-xl border border-emerald-400/30 flex items-center gap-1.5 ${alert.greenCorridorLevel ? 'animate-pulse' : 'opacity-80'}`}>
               <Shield size={10} className="text-white" />
-              <span className="text-white font-bold text-[10px] tracking-wide">GREEN CORRIDOR: {alert.greenCorridorLevel || 'ACTIVE'}</span>
+              <span className="text-white font-bold text-[10px] tracking-wide">
+                {alert.greenCorridorLevel ? `GREEN CORRIDOR: ${alert.greenCorridorLevel}` : 'TRAFFIC HELP REQUESTED'}
+              </span>
+            </div>
+          )}
+          {alert.hospitalName && (
+            <div className="bg-blue-600/90 backdrop-blur px-3 py-1.5 rounded-xl border border-blue-400/30 flex items-center gap-1.5">
+              <Hospital size={10} className="text-white" />
+              <span className="text-white font-bold text-[10px] tracking-wide truncate max-w-[100px]">{alert.hospitalName}</span>
             </div>
           )}
         </div>
@@ -334,9 +342,35 @@ export default function ActiveEmergencyPage() {
                 <button
                   key={lvl}
                   onClick={() => import('@/lib/alertService').then(m => m.updateGreenCorridor(alert.id, lvl))}
-                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${alert.greenCorridorLevel === lvl ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}
+                  className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${alert.greenCorridorLevel === lvl ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}
                 >
                   {lvl}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Hospital Selection Panel */}
+        {currentUser?.role === 'hospital' && (
+          <div className="bg-blue-900/20 border-b border-blue-500/10 px-4 py-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Hospital size={10} className="animate-pulse" /> Hospital Route Management
+              </span>
+              <span className="text-[10px] text-blue-300/60 font-bold">{alert.hospitalName || 'SELECT DESTINATION'}</span>
+            </div>
+            <div className="flex gap-2">
+              {[
+                { name: 'City Central Hospital', lat: 28.625, lng: 77.215 },
+                { name: 'Red Cross Medical Center', lat: 28.618, lng: 77.230 },
+              ].map(h => (
+                <button
+                  key={h.name}
+                  onClick={() => import('@/lib/alertService').then(m => m.setHospitalDestination(alert.id, h.name, h.lat, h.lng))}
+                  className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${alert.hospitalName === h.name ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}
+                >
+                  <MapPin size={10} className="inline mr-1" /> {h.name.split(' ')[0]}
                 </button>
               ))}
             </div>
