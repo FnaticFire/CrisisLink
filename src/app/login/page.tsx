@@ -51,21 +51,14 @@ export default function LoginPage() {
             setActiveAlert(activeAlert);
             router.push('/active');
           } else {
+            setActiveAlert(null); // CRITICAL: Clear any stale persisted alert from previous logins
             router.push('/');
           }
         } else {
-          const recoveredUser: UserDoc = {
-            id: cred.user.uid,
-            email: cred.user.email || email,
-            username: cred.user.displayName || email.split('@')[0],
-            role: 'civilian',
-            isVolunteer: false,
-            isAvailable: true,
-          };
-          await setDoc(doc(db, 'users', cred.user.uid), recoveredUser);
-          setCurrentUser(recoveredUser);
-          localStorage.setItem('crisislink_login_at', Date.now().toString());
-          router.push('/');
+          // If user exists in Auth but not Firestore, don't silently create a civilian account
+          toast.error("Account profile not found. Please register again with your correct role.");
+          setLoading(false);
+          return;
         }
       } else {
         // Validate phone for officers
