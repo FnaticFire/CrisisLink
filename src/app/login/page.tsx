@@ -152,6 +152,7 @@ export default function LoginPage() {
                   <option value="police">Police Dept</option>
                   <option value="fire">Fire Dept</option>
                   <option value="hospital">Hospital / Ambulance</option>
+                  <option value="traffic">Traffic Police</option>
                 </select>
               </div>
 

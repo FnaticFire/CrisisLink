@@ -13,6 +13,7 @@ interface AppState {
   alertHistory: Array<{ id: string; type: string; status: string; date: Date; severity: string; location: string }>;
   messages: Array<any>;
   responders: Array<any>;
+  theme: 'dark' | 'light';
 
   setCurrentUser: (user: UserDoc | null) => void;
   updateUser: (updates: Partial<UserDoc>) => void;
@@ -28,6 +29,7 @@ interface AppState {
   addSavedLocation: (loc: any) => void;
   removeSavedLocation: (id: string) => void;
   setRole: (role: any) => void;
+  toggleTheme: () => void;
 }
 
 import { persist, createJSONStorage } from 'zustand/middleware';
@@ -45,6 +47,7 @@ export const useAppStore = create<AppState>()(
       alertHistory: [],
       messages: [],
       responders: [],
+      theme: 'light',
 
       setCurrentUser: (user) => set({ currentUser: user }),
       updateUser: (updates) => set((state) => ({ 
@@ -65,6 +68,7 @@ export const useAppStore = create<AppState>()(
       addSavedLocation: () => {},
       removeSavedLocation: () => {},
       setRole: () => {},
+      toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
     }),
     {
       name: 'crisislink-storage',

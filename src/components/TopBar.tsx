@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, Search, X, Check, MapPin, RefreshCw, LogOut } from 'lucide-react';
+import { Bell, Search, X, Check, MapPin, RefreshCw, LogOut, Sun, Moon } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -15,7 +15,7 @@ interface TopBarProps {
 }
 
 const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuery = '' }) => {
-  const { currentUser, notifications, markNotificationsRead, updateUserLocation, setCurrentUser } = useAppStore();
+  const { currentUser, notifications, markNotificationsRead, updateUserLocation, setCurrentUser, theme, toggleTheme } = useAppStore();
   const [showNotifs, setShowNotifs] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const router = useRouter();
@@ -93,10 +93,10 @@ const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuer
   };
 
   return (
-    <div className="pt-6 px-6 bg-white shrink-0 relative z-50">
+    <div className="pt-6 px-6 bg-[var(--nav-bg)] shrink-0 relative z-50 transition-colors duration-300">
       <div className="flex items-center justify-between mb-4">
         <div className="flex flex-col">
-          <span className="text-xs text-gray-400 font-medium tracking-wide flex items-center gap-1">
+          <span className="text-xs text-gray-400 dark:text-slate-500 font-medium tracking-wide flex items-center gap-1">
             <MapPin size={12} className="text-primary" />
             YOUR LOCATION
             <button
@@ -107,11 +107,18 @@ const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuer
               <RefreshCw size={12} className={`text-gray-500 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
           </span>
-          <h2 className="text-sm font-semibold text-gray-800 truncate max-w-[180px]">
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-slate-200 truncate max-w-[180px]">
             {currentUser?.location?.address || 'Locating...'}
           </h2>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={toggleTheme}
+            className="p-2.5 bg-gray-50 dark:bg-slate-800 rounded-full text-gray-600 dark:text-slate-300 soft-shadow tap-effect"
+            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
           <button
             onClick={handleSignOut}
             className="p-2.5 bg-red-50 rounded-full text-red-500 soft-shadow tap-effect"
@@ -139,7 +146,7 @@ const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuer
             value={searchQuery}
             onChange={(e) => onSearch?.(e.target.value)}
             placeholder="Search responders or services..."
-            className="w-full bg-gray-50 border-none rounded-2xl py-3.5 pl-11 pr-10 text-sm focus:ring-2 focus:ring-primary/20 transition-all soft-shadow outline-none"
+            className="w-full bg-[var(--input-bg)] border-[var(--border)] border rounded-2xl py-3.5 pl-11 pr-10 text-sm dark:text-slate-200 focus:ring-2 focus:ring-primary/20 transition-all soft-shadow outline-none"
           />
           {searchQuery && (
             <button
@@ -154,9 +161,9 @@ const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuer
 
       {/* Notifications Dropdown */}
       {showNotifs && (
-        <div className="absolute top-[100%] right-6 w-80 bg-white rounded-2xl border border-gray-100 shadow-2xl z-50 max-h-[60vh] overflow-y-auto no-scrollbar animate-in slide-in-from-top-5 duration-200">
-          <div className="p-4 border-b border-gray-50 flex items-center justify-between">
-            <h3 className="font-black text-gray-900 text-sm">Notifications</h3>
+        <div className="absolute top-[100%] right-6 w-80 bg-[var(--card)] rounded-2xl border border-[var(--border)] shadow-2xl z-50 max-h-[60vh] overflow-y-auto no-scrollbar animate-in slide-in-from-top-5 duration-200">
+          <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
+            <h3 className="font-black text-[var(--foreground)] text-sm">Notifications</h3>
             <button onClick={() => setShowNotifs(false)} className="text-gray-400 p-1">
               <X size={16} />
             </button>
@@ -170,8 +177,8 @@ const TopBar: React.FC<TopBarProps> = ({ showSearch = true, onSearch, searchQuer
                   {n.read ? <Check size={14} /> : <Bell size={14} />}
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs font-bold text-gray-900">{n.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
+                  <p className="text-xs font-bold text-[var(--foreground)]">{n.title}</p>
+                  <p className="text-xs text-[var(--muted)] mt-0.5">{n.body}</p>
                   <p className="text-[10px] text-gray-400 mt-1">{formatDistanceToNow(n.time, { addSuffix: true })}</p>
                 </div>
               </div>

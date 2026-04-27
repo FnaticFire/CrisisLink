@@ -112,6 +112,7 @@ export default function Home() {
         if (role === 'fire' && (type.includes('fire') || type.includes('collapse'))) return true;
         if (role === 'hospital' && (type.includes('medical') || type.includes('accident') || type.includes('health'))) return true;
         if (role === 'police' && !type.includes('volunteer')) return true;
+        if (role === 'traffic' && (a.trafficSupport || type.includes('fire') || type.includes('medical') || type.includes('accident'))) return true;
       }
 
       // Volunteer routing (10km radius + MUST be available)
@@ -168,6 +169,32 @@ export default function Home() {
     }
   };
 
+  const handleJoinAsTraffic = async (alert: AlertDoc) => {
+    if (!currentUser || accepting) return;
+    setAccepting(alert.id);
+    try {
+      const { joinAsTrafficSupport } = await import('@/lib/alertService');
+      const { sendChatMessage } = await import('@/lib/chatService');
+      
+      await joinAsTrafficSupport(alert.id, currentUser);
+      await sendChatMessage(alert.id, {
+        senderId: currentUser.id,
+        senderName: currentUser.username,
+        senderRole: currentUser.role,
+        text: "🟢 Traffic Control Joined. Green Corridor being established.",
+        timestamp: Date.now(),
+      });
+      
+      setActiveAlert({ ...alert, trafficSupport: true, trafficResponderId: currentUser.id });
+      toast.success('Joined as Traffic Support');
+      router.push('/active');
+    } catch (err) {
+      toast.error('Failed to join.');
+    } finally {
+      setAccepting(null);
+    }
+  };
+
   const handleVolunteerRequest = async () => {
     if (!volDescription.trim() || !currentUser) return;
     setVolSending(true);
@@ -208,7 +235,7 @@ export default function Home() {
   ];
 
   return (
-    <div className="flex flex-col flex-1 pb-24 overflow-y-auto no-scrollbar">
+    <div className="flex flex-col flex-1 pb-24 overflow-y-auto no-scrollbar bg-[var(--background)] transition-colors duration-300">
       <TopBar onSearch={setSearchQuery} searchQuery={searchQuery} />
 
       <main className="flex-1 px-5 pt-2">
@@ -286,12 +313,12 @@ export default function Home() {
         {/* ── RESPONDER & VOLUNTEER: Incoming Alerts ── */}
         {((isResponder) || (isCivilian && currentUser?.isVolunteer)) && (
           <div className="mb-6">
-            <h3 className="text-base font-bold text-slate-800 mb-3">
+            <h3 className="text-base font-bold text-[var(--foreground)] mb-3">
               {isCivilian ? 'Local Help Requests' : 'Relevant Alerts'} ({filteredAlerts.length})
             </h3>
             {pendingAlerts.length === 0 ? (
-              <div className="bg-white rounded-2xl p-8 card-shadow text-center">
-                <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2" />
+              <div className="bg-[var(--card)] rounded-2xl p-8 card-shadow text-center">
+                <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2 opacity-80" />
                 <p className="text-sm font-semibold text-slate-400">No active emergencies</p>
                 <p className="text-xs text-slate-300 mt-1">You'll be notified when one appears.</p>
               </div>
@@ -304,7 +331,7 @@ export default function Home() {
                     : '?';
                   const isAccepted = a.status !== 'pending';
                   return (
-                    <div key={a.id} className="bg-white rounded-2xl p-4 card-shadow border border-slate-50">
+                    <div key={a.id} className="bg-[var(--card)] rounded-2xl p-4 card-shadow border border-[var(--border)]">
                       <div className="flex items-center gap-3 mb-3">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg shadow-sm ${a.severity === 'CRITICAL' ? 'bg-red-500' : a.severity === 'HIGH' ? 'bg-orange-500' : 'bg-yellow-500'}`}>
                           🚨
@@ -325,7 +352,17 @@ export default function Home() {
                           {accepting === a.id ? 'Accepting...' : 'Accept & Navigate'}
                         </button>
                       ) : (
-                        <div className="text-center text-xs text-emerald-500 font-semibold py-2">✓ Accepted by {a.responderName}</div>
+                        currentUser?.role === 'traffic' && a.trafficResponderId !== currentUser.id ? (
+                          <button
+                            onClick={() => handleJoinAsTraffic(a)}
+                            disabled={accepting === a.id}
+                            className="w-full bg-emerald-600 text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 transition-all shadow-lg shadow-emerald-900/20"
+                          >
+                            <Shield size={16} /> Establish Green Corridor
+                          </button>
+                        ) : (
+                          <div className="text-center text-xs text-emerald-500 font-semibold py-2">✓ Accepted by {a.responderName}</div>
+                        )
                       )}
                     </div>
                   );
@@ -338,12 +375,12 @@ export default function Home() {
         {/* Quick Dial — for civilians */}
         {isCivilian && (
           <div className="mb-6">
-            <h3 className="text-base font-bold text-slate-800 mb-3">Quick Dial</h3>
+            <h3 className="text-base font-bold text-[var(--foreground)] mb-3">Quick Dial</h3>
             <div className="grid grid-cols-3 gap-2.5">
               {EMERGENCY_NUMBERS.map((em) => {
                 const Icon = em.icon;
                 return (
-                  <a key={em.number} href={`tel:${em.number}`} className="flex flex-col items-center gap-2 p-3.5 bg-white rounded-2xl card-shadow card-hover tap-effect">
+                  <a key={em.number} href={`tel:${em.number}`} className="flex flex-col items-center gap-2 p-3.5 bg-[var(--card)] rounded-2xl card-shadow card-hover tap-effect border border-[var(--border)]">
                     <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${em.gradient} flex items-center justify-center shadow-sm`}><Icon size={18} className="text-white" /></div>
                     <p className="text-[11px] font-bold text-slate-700">{em.number}</p>
                     <p className="text-[9px] font-medium text-slate-400">{em.label}</p>
@@ -359,10 +396,10 @@ export default function Home() {
 
       {showSafetyTips && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-end p-4">
-          <div className="w-full bg-white rounded-3xl p-6 max-h-[80vh] overflow-y-auto no-scrollbar card-shadow">
+          <div className="w-full bg-[var(--card)] rounded-3xl p-6 max-h-[80vh] overflow-y-auto no-scrollbar card-shadow">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-slate-900">Safety Tips</h2>
-              <button onClick={() => setShowSafetyTips(false)} className="p-2 bg-slate-100 rounded-xl text-slate-400"><X size={18} /></button>
+              <h2 className="text-lg font-bold text-[var(--foreground)]">Safety Tips</h2>
+              <button onClick={() => setShowSafetyTips(false)} className="p-2 bg-[var(--background)] rounded-xl text-[var(--muted)]"><X size={18} /></button>
             </div>
             <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
               {SAFETY_TIPS.map((tip, i) => (
@@ -371,10 +408,10 @@ export default function Home() {
                 </button>
               ))}
             </div>
-            <div className="bg-slate-50 rounded-2xl p-4">
-              <h3 className="font-bold text-slate-800 mb-2">{SAFETY_TIPS[selectedTip].icon} {SAFETY_TIPS[selectedTip].title}</h3>
+            <div className="bg-[var(--background)] rounded-2xl p-4">
+              <h3 className="font-bold text-[var(--foreground)] mb-2">{SAFETY_TIPS[selectedTip].icon} {SAFETY_TIPS[selectedTip].title}</h3>
               {SAFETY_TIPS[selectedTip].tips.map((t, i) => (
-                <p key={i} className="text-sm text-slate-600 mb-1.5"><span className="font-bold text-primary">{i+1}.</span> {t}</p>
+                <p key={i} className="text-sm text-[var(--muted)] dark:text-slate-300 mb-1.5 font-medium"><span className="font-bold text-primary">{i+1}.</span> {t}</p>
               ))}
             </div>
           </div>
@@ -384,22 +421,22 @@ export default function Home() {
       {/* Volunteer Request Modal */}
       {showVolunteerReq && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-end p-4">
-          <div className="w-full bg-white rounded-3xl p-6 card-shadow animate-in slide-in-from-bottom-10 duration-300">
+          <div className="w-full bg-[var(--card)] rounded-3xl p-6 card-shadow animate-in slide-in-from-bottom-10 duration-300">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 rounded-xl flex items-center justify-center">
                   <HandHelping size={20} />
                 </div>
-                <h2 className="font-bold text-slate-900">Request Volunteer</h2>
+                <h2 className="font-bold text-[var(--foreground)]">Request Volunteer</h2>
               </div>
-              <button onClick={() => setShowVolunteerReq(false)} className="p-2 bg-slate-100 rounded-xl text-slate-400"><X size={18} /></button>
+              <button onClick={() => setShowVolunteerReq(false)} className="p-2 bg-[var(--background)] rounded-xl text-[var(--muted)]"><X size={18} /></button>
             </div>
             <p className="text-xs text-slate-400 mb-3">Describe what help you need. Nearby volunteers will be notified.</p>
             <textarea
               value={volDescription}
               onChange={(e) => setVolDescription(e.target.value)}
               placeholder='e.g. "Need help carrying groceries, elderly person at Gate 4"'
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-none h-24 mb-4 transition-all"
+              className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm dark:text-slate-200 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 resize-none h-24 mb-4 transition-all"
             />
             <button
               onClick={handleVolunteerRequest}
@@ -418,7 +455,7 @@ export default function Home() {
         <div className="px-5 mb-6">
           <button 
             onClick={toggleVolunteer}
-            className={`w-full py-4 rounded-2xl border-2 flex items-center justify-between px-6 transition-all ${currentUser?.isVolunteer ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'}`}
+            className={`w-full py-4 rounded-2xl border-2 flex items-center justify-between px-6 transition-all ${currentUser?.isVolunteer ? 'bg-violet-50 dark:bg-violet-900/10 border-violet-200 dark:border-violet-900/30 text-violet-700 dark:text-violet-400' : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted)] hover:border-slate-200'}`}
           >
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${currentUser?.isVolunteer ? 'bg-violet-500 text-white' : 'bg-slate-100 text-slate-400'}`}>

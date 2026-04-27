@@ -120,6 +120,7 @@ export async function acceptAlert(alertId: string, responder: UserDoc): Promise<
       responderRole: responder.role,
       responderLocation: responder.location ? { lat: responder.location.lat, lng: responder.location.lng } : null,
       acceptedAt: Date.now(),
+      trafficSupport: responder.role === 'fire' || responder.role === 'hospital',
     });
     debugLog('Firestore', `Alert ${alertId} accepted by ${responder.username}`);
   } catch (err) {
@@ -162,6 +163,30 @@ export async function resolveAlertInDB(alertId: string): Promise<void> {
   } catch (err) {
     debugError('Firestore', 'resolveAlert failed:', err);
     throw err;
+  }
+}
+
+// ─── Traffic Support & Green Corridor ───
+export async function joinAsTrafficSupport(alertId: string, responder: UserDoc): Promise<void> {
+  try {
+    const ref = doc(db, ALERTS_COL, alertId);
+    await updateDoc(ref, {
+      trafficSupport: true,
+      trafficResponderId: responder.id,
+      trafficResponderName: responder.username,
+      greenCorridorLevel: 'MEDIUM'
+    });
+  } catch (err) {
+    debugError('Firestore', 'joinAsTrafficSupport failed:', err);
+  }
+}
+
+export async function updateGreenCorridor(alertId: string, level: 'LOW' | 'MEDIUM' | 'HIGH' | 'MAX'): Promise<void> {
+  try {
+    const ref = doc(db, ALERTS_COL, alertId);
+    await updateDoc(ref, { greenCorridorLevel: level });
+  } catch (err) {
+    debugError('Firestore', 'updateGreenCorridor failed:', err);
   }
 }
 

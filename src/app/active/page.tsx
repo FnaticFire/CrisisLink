@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
-import { X, Send, Navigation, CheckCircle2, MessageSquare, Radio, Phone, Loader2 } from 'lucide-react';
+import { X, Send, Navigation, CheckCircle2, MessageSquare, Radio, Phone, Loader2, Shield } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { listenToAlert, haversineKm, resolveAlertInDB, getEmergencyNumber } from '@/lib/alertService';
@@ -34,7 +34,8 @@ export default function ActiveEmergencyPage() {
   const isCivilian = currentUser?.role === 'civilian';
   const isResponder = !isCivilian;
   const isAssignedResponder = currentUser?.id === alert?.responderId;
-  const isCurrentlyResponding = isResponder || isAssignedResponder;
+  const isTrafficResponder = currentUser?.role === 'traffic' || currentUser?.id === alert?.trafficResponderId;
+  const isCurrentlyResponding = isResponder || isAssignedResponder || isTrafficResponder;
 
   // Real-time Firestore sync
   useEffect(() => {
@@ -105,10 +106,10 @@ export default function ActiveEmergencyPage() {
     const id = navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        if (isCivilian) {
-          import('@/lib/alertService').then(m => m.updateUserLocationInAlert(alert.id, latitude, longitude));
-        } else {
+        if (isAssignedResponder || isTrafficResponder) {
           import('@/lib/alertService').then(m => m.updateResponderLocation(alert.id, latitude, longitude));
+        } else if (isCivilian && currentUser?.id === alert.userId) {
+          import('@/lib/alertService').then(m => m.updateUserLocationInAlert(alert.id, latitude, longitude));
         }
       },
       (err) => debugError('GPS-Tracking', err),
@@ -145,7 +146,7 @@ export default function ActiveEmergencyPage() {
   const respLng = alert.responderLocation?.lng || (alert.userLocation.lng + 0.008);
   const distKm = haversineKm(alert.userLocation.lat, alert.userLocation.lng, respLat, respLng);
   const etaSec = Math.max(0, Math.floor((distKm / 40) * 3600));
-  const canResolve = isAssignedResponder && distKm < 0.5;
+  const canResolve = (isAssignedResponder || isTrafficResponder) && (distKm < 0.5 || currentUser?.isVolunteer);
   const emergencyDial = getEmergencyNumber(alert.type);
   
   // Contextual Quick Replies
@@ -258,6 +259,12 @@ export default function ActiveEmergencyPage() {
               <span className="text-white font-semibold text-[11px]">ETA: {formatETA(etaSec)} • {distKm.toFixed(1)} km</span>
             </div>
           )}
+          {alert.trafficSupport && (
+            <div className="bg-emerald-600/90 backdrop-blur px-3 py-1.5 rounded-xl border border-emerald-400/30 flex items-center gap-1.5 animate-pulse">
+              <Shield size={10} className="text-white" />
+              <span className="text-white font-bold text-[10px] tracking-wide">GREEN CORRIDOR: {alert.greenCorridorLevel || 'ACTIVE'}</span>
+            </div>
+          )}
         </div>
 
         {/* Floating card for Civilian (shows search status or responder info) */}
@@ -308,13 +315,36 @@ export default function ActiveEmergencyPage() {
           )}
           {canResolve && (
             <button onClick={handleResolve} className="bg-green-600 text-white font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 active:scale-95 shadow-lg shadow-green-900/20">
-              <CheckCircle2 size={13} /> Resolve Alert
+              <CheckCircle2 size={13} /> Resolve
             </button>
           )}
         </div>
 
-        {isCivilian ? (
-          /* CIVILIAN VIEW: AI CHAT */
+        {/* Traffic Police Control Panel */}
+        {currentUser?.role === 'traffic' && (
+          <div className="bg-emerald-900/20 border-b border-emerald-500/10 px-4 py-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Radio size={10} className="animate-pulse" /> Traffic Control Panel
+              </span>
+              <span className="text-[10px] text-emerald-300/60 font-bold">MANAGE GREEN SECTORS</span>
+            </div>
+            <div className="flex gap-2">
+              {(['LOW', 'MEDIUM', 'HIGH', 'MAX'] as const).map(lvl => (
+                <button
+                  key={lvl}
+                  onClick={() => import('@/lib/alertService').then(m => m.updateGreenCorridor(alert.id, lvl))}
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black transition-all ${alert.greenCorridorLevel === lvl ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}
+                >
+                  {lvl}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isCurrentlyResponding ? (
+          /* SURVIVOR VIEW: AI CHAT GUIDE */
           <>
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
               {aiMessages.map((m, i) => (

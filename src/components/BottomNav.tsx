@@ -24,7 +24,7 @@ const BottomNav = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] bg-white/90 backdrop-blur-lg border-t border-gray-100 flex justify-around py-3 px-2 z-50 rounded-t-2xl soft-shadow">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[420px] bg-[var(--nav-bg)] opacity-95 backdrop-blur-lg border-t border-[var(--border)] flex justify-around py-3 px-2 z-50 rounded-t-2xl soft-shadow transition-colors duration-300">
       {navItems.map((item) => {
         const isActive = pathname === item.path;
         const Icon = item.icon;

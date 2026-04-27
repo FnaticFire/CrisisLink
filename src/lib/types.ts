@@ -1,4 +1,4 @@
-export type Role = 'civilian' | 'police' | 'fire' | 'hospital';
+export type Role = 'civilian' | 'police' | 'fire' | 'hospital' | 'traffic';
 
 export interface UserDoc {
   id: string;
@@ -40,6 +40,10 @@ export interface AlertDoc {
   createdAt: number;
   acceptedAt?: number;
   resolvedAt?: number;
+  trafficSupport?: boolean;
+  trafficResponderId?: string;
+  trafficResponderName?: string;
+  greenCorridorLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'MAX';
 }
 
 export interface ChatMessageDoc {

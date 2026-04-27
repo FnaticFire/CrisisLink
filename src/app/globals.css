@@ -20,6 +20,21 @@
   --foreground: #0F172A;
   --card: #FFFFFF;
   --muted: #94A3B8;
+  --container-bg: linear-gradient(180deg, #EEF2FF 0%, #F0F4F8 30%, #F8FAFC 100%);
+  --nav-bg: #FFFFFF;
+  --border: rgba(0, 0, 0, 0.05);
+  --input-bg: #FFFFFF;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #F8FAFC;
+  --card: #0F172A;
+  --muted: #64748B;
+  --container-bg: linear-gradient(180deg, #020617 0%, #0F172A 100%);
+  --nav-bg: #0F172A;
+  --border: rgba(255, 255, 255, 0.06);
+  --input-bg: #1E293B;
 }
 
 body {
@@ -37,19 +52,21 @@ body {
   margin: 0 auto;
   min-height: 100vh;
   min-height: 100dvh;
-  background: linear-gradient(180deg, #EEF2FF 0%, #F0F4F8 30%, #F8FAFC 100%);
+  background: var(--container-bg);
   position: relative;
   box-shadow: 0 0 60px rgba(0,0,0,0.06);
   display: flex;
   flex-direction: column;
+  transition: background 0.3s ease;
 }
 
 /* ── Glass Morphism ── */
 .glass {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--nav-bg);
+  opacity: 0.95;
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--border);
 }
 
 .glass-dark {
