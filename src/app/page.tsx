@@ -301,8 +301,8 @@ export default function Home() {
             const Icon = action.icon;
             const inner = (
               <div className="flex flex-col items-center gap-2">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${action.bg} ${action.color} ring-1 ${action.ring} card-hover`}><Icon size={22} strokeWidth={1.8} /></div>
-                <span className="text-[10px] font-semibold text-slate-500">{action.label}</span>
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${action.bg} ${action.color} ring-1 ${action.ring} card-hover shadow-sm`}><Icon size={22} strokeWidth={1.8} /></div>
+                <span className="text-[10px] font-semibold text-[var(--muted)]">{action.label}</span>
               </div>
             );
             if ('action' in action && action.action) return <button key={idx} onClick={action.action} className="tap-effect">{inner}</button>;
@@ -319,8 +319,8 @@ export default function Home() {
             {pendingAlerts.length === 0 ? (
               <div className="bg-[var(--card)] rounded-2xl p-8 card-shadow text-center">
                 <CheckCircle2 size={28} className="text-emerald-400 mx-auto mb-2 opacity-80" />
-                <p className="text-sm font-semibold text-slate-400">No active emergencies</p>
-                <p className="text-xs text-slate-300 mt-1">You'll be notified when one appears.</p>
+                <p className="text-sm font-semibold text-[var(--muted)]">No active emergencies</p>
+                <p className="text-xs text-[var(--muted)] opacity-60 mt-1">You'll be notified when one appears.</p>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
@@ -337,11 +337,11 @@ export default function Home() {
                           🚨
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-800 truncate">{a.type}</p>
-                          <p className="text-[11px] text-slate-400">{a.userName} • {dist} km away • {a.severity}</p>
+                          <p className="text-sm font-bold text-[var(--foreground)] truncate">{a.type}</p>
+                          <p className="text-[11px] text-[var(--muted)]">{a.userName} • {dist} km away • {a.severity}</p>
                         </div>
                       </div>
-                      <p className="text-xs text-slate-500 mb-3">{a.reason}</p>
+                      <p className="text-xs text-[var(--muted)] dark:text-slate-400 mb-3">{a.reason}</p>
                       {!isAccepted ? (
                         <button
                           onClick={() => handleAcceptAlert(a)}
@@ -476,18 +476,18 @@ export default function Home() {
       {/* Force Phone Update Modal */}
       {showPhoneUpdate && (
         <div className="fixed inset-0 z-[200] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="w-full max-w-sm bg-white rounded-[32px] p-8 card-shadow border border-slate-100 text-center animate-in zoom-in-95 duration-300">
-            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <div className="w-full max-w-sm bg-[var(--card)] rounded-[32px] p-8 card-shadow border border-[var(--border)] text-center animate-in zoom-in-95 duration-300">
+            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <Phone size={32} />
             </div>
-            <h2 className="text-xl font-black text-slate-900 mb-2">Complete Your Profile</h2>
-            <p className="text-sm text-slate-400 mb-6 leading-relaxed">Please provide your mobile number so responders can reach you in case of emergency.</p>
+            <h2 className="text-xl font-black text-[var(--foreground)] mb-2">Complete Your Profile</h2>
+            <p className="text-sm text-[var(--muted)] mb-6 leading-relaxed">Please provide your mobile number so responders can reach you in case of emergency.</p>
             <input 
               type="tel"
               value={newPhone}
               onChange={e => setNewPhone(e.target.value)}
               placeholder="+91 XXXXX XXXXX"
-              className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-center text-lg font-bold outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 mb-6"
+              className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded-2xl px-5 py-4 text-center text-[var(--foreground)] text-lg font-bold outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 mb-6"
             />
             <button 
               onClick={handleUpdatePhone}

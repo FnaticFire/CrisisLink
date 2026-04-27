@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { getMyActiveAlert, getResponderActiveAlert } from '@/lib/alertService';
+import { Sun, Moon } from 'lucide-react';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -22,7 +23,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
-  const { setCurrentUser, setActiveAlert } = useAppStore();
+  const { setCurrentUser, setActiveAlert, theme, toggleTheme } = useAppStore();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,42 +101,49 @@ export default function LoginPage() {
   const isOfficer = role !== 'civilian';
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'linear-gradient(135deg, #EEF2FF 0%, #F0F4F8 50%, #E0F2FE 100%)' }}>
-      <div className="w-full max-w-sm bg-white rounded-3xl p-8 card-shadow">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-[var(--background)] transition-colors duration-300 relative">
+      <button 
+        onClick={toggleTheme}
+        className="absolute top-6 right-6 p-3 bg-[var(--card)] rounded-full text-[var(--foreground)] soft-shadow transition-all active:scale-95 border border-[var(--border)]"
+      >
+        {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+      </button>
+
+      <div className="w-full max-w-sm bg-[var(--card)] rounded-3xl p-8 card-shadow border border-[var(--border)]">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-br from-primary to-indigo-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg shadow-primary/20">
             <Shield size={32} />
           </div>
-          <h1 className="text-2xl font-black text-slate-900">CrisisLink</h1>
-          <p className="text-sm font-medium text-slate-400">Emergency Coordination Network</p>
+          <h1 className="text-2xl font-black text-[var(--foreground)]">CrisisLink</h1>
+          <p className="text-sm font-medium text-[var(--muted)]">Emergency Coordination Network</p>
         </div>
 
         <form onSubmit={handleAuth} className="flex flex-col gap-3.5">
           {!isLogin && (
             <div>
-              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1 block">Username</label>
+              <label className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider pl-1 mb-1 block">Username</label>
               <input
                 required type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm font-medium outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded-xl py-3 px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                 placeholder="Your display name"
               />
             </div>
           )}
 
           <div>
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1 block">Email</label>
+            <label className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider pl-1 mb-1 block">Email</label>
             <input
               required type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm font-medium outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+              className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded-xl py-3 px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
               placeholder="name@example.com"
             />
           </div>
 
           <div>
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1 block">Password</label>
+            <label className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider pl-1 mb-1 block">Password</label>
             <input
               required type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm font-medium outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+              className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded-xl py-3 px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
               placeholder="••••••••"
             />
           </div>
@@ -143,10 +151,10 @@ export default function LoginPage() {
           {!isLogin && (
             <>
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1 block">Join As</label>
+                <label className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider pl-1 mb-1 block">Join As</label>
                 <select
                   value={role} onChange={(e) => setRole(e.target.value as Role)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm font-medium outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                  className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded-xl py-3 px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                 >
                   <option value="civilian">Civilian</option>
                   <option value="police">Police Dept</option>
@@ -159,10 +167,10 @@ export default function LoginPage() {
               {/* Phone for officers */}
               {isOfficer && (
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pl-1 mb-1 block">Phone Number *</label>
+                  <label className="text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider pl-1 mb-1 block">Phone Number *</label>
                   <input
                     required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm font-medium outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                    className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded-xl py-3 px-4 text-sm font-medium text-[var(--foreground)] outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
                     placeholder="+91 98765 43210"
                   />
                 </div>
@@ -175,7 +183,7 @@ export default function LoginPage() {
                     onChange={(e) => setIsVolunteer(e.target.checked)}
                     className="w-4 h-4 accent-primary rounded"
                   />
-                  <label htmlFor="volunteer" className="text-sm font-medium text-slate-600 select-none">
+                  <label htmlFor="volunteer" className="text-sm font-medium text-[var(--muted)] select-none">
                     Available to volunteer during emergencies
                   </label>
                 </div>
@@ -194,7 +202,7 @@ export default function LoginPage() {
         <div className="mt-6 text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
-            className="text-xs font-semibold text-slate-400 hover:text-primary transition-colors"
+            className="text-xs font-semibold text-[var(--muted)] hover:text-primary transition-colors"
           >
             {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
           </button>
