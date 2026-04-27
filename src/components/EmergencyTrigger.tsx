@@ -25,8 +25,7 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setActiveAlert, currentUser } = useAppStore();
   const router = useRouter();
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -42,72 +41,71 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
     return true;
   };
 
-  // ── Voice SOS (MediaRecorder -> Gemini 1.5) ──
-  const handleStartRecording = async () => {
+  // ── Voice SOS (Native Web Speech API) ──
+  const handleStartRecording = () => {
     if (!checkRateLimits()) return;
     
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { 
+      toast.error('Voice not supported on this browser. Please type.'); 
+      setStep('text'); 
+      return; 
+    }
+
+    setStep('recording');
+    setRecordTime(0);
+
+    const rec = new SR();
+    recognitionRef.current = rec;
+    rec.lang = 'en-US';
+    rec.continuous = true;
+    rec.interimResults = true;
+    
+    let finalTranscript = '';
+    let isTerminated = false;
+
+    rec.onresult = (e: any) => {
+      let current = '';
+      for (let i = e.resultIndex; i < e.results.length; ++i) {
+        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + ' ';
+        else current += e.results[i][0].transcript;
+      }
+      debugLog('Live-Speech', finalTranscript + current);
+    };
+
+    rec.onerror = (e: any) => {
+      debugError('Speech', e.error);
+      if (!isTerminated) {
+        isTerminated = true;
+        setStep('text');
+        toast.error('Voice input failed. Please type description.');
+      }
+    };
+
+    rec.onend = () => {
+      if (isTerminated) return;
+      isTerminated = true;
+      const t = finalTranscript.trim();
+      if (t) handleProcess(t);
+      else {
+        toast.error('No speech detected.');
+        setStep('text');
+      }
+    };
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        stream.getTracks().forEach(track => track.stop());
-        handleUploadVoice(audioBlob);
-      };
-
-      setStep('recording');
-      setRecordTime(0);
-      recorder.start();
-
+      rec.start();
       // Auto-stop after 8 seconds
       setTimeout(() => {
-        if (recorder.state === 'recording') recorder.stop();
+        try { rec.stop(); } catch {}
       }, 8000);
-
-    } catch (err) {
-      debugError('Audio', err);
-      toast.error('Microphone access denied. Use text input.');
+    } catch {
       setStep('text');
     }
   };
 
   const handleStopRecording = () => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-  };
-
-  const handleUploadVoice = async (blob: Blob) => {
-    setStep('processing');
-    setProcessingStep('AI Listening to transcript...');
-    
-    try {
-      incrementAICount();
-      const formData = new FormData();
-      formData.append('audio', blob);
-
-      const res = await fetch('/api/voice-sos', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error('Voice analysis failed');
-      
-      const result = await res.json();
-      setAiResult(result);
-      setStep('confirming');
-    } catch (err) {
-      debugError('Voice-API', err);
-      toast.error('❌ Voice processing failed.');
-      setStep('selecting');
-    }
+    try { recognitionRef.current?.stop(); } catch {}
   };
 
   // ── Text ──
