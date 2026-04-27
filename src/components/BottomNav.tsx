@@ -11,7 +11,7 @@ const BottomNav = () => {
   const { currentUser, activeAlert } = useAppStore();
 
   // Hide bottom nav on these routes
-  if (pathname === '/chat' || pathname === '/active' || pathname === '/login') return null;
+  if (pathname === '/chat' || pathname === '/active' || pathname === '/login' || pathname === '/landing') return null;
 
   const isCivilian = currentUser?.role === 'civilian';
 

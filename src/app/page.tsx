@@ -53,7 +53,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!currentUser) { 
-      router.replace('/login'); 
+      router.replace('/landing'); 
       return; 
     }
 
