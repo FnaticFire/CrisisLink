@@ -39,10 +39,13 @@ export default function LoginPage() {
           setCurrentUser(userData);
           localStorage.setItem('crisislink_login_at', Date.now().toString());
           
-          // Restore any active alert / mission
-          const activeAlert = (userData.role === 'civilian') 
-            ? await getMyActiveAlert(userData.id)
-            : await getResponderActiveAlert(userData.id);
+          // Restore any active alert / mission (Survivor OR Responder role)
+          const [asSurvivor, asResponder] = await Promise.all([
+            getMyActiveAlert(userData.id),
+            getResponderActiveAlert(userData.id)
+          ]);
+
+          const activeAlert = asSurvivor || asResponder;
 
           if (activeAlert) {
             setActiveAlert(activeAlert);

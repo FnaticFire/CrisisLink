@@ -25,7 +25,8 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setActiveAlert, currentUser } = useAppStore();
   const router = useRouter();
-  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -41,44 +42,73 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
     return true;
   };
 
-  // ── Voice ──
-  const handleStartRecording = () => {
+  // ── Voice SOS (MediaRecorder -> Gemini 1.5) ──
+  const handleStartRecording = async () => {
     if (!checkRateLimits()) return;
-    setStep('recording');
-    setRecordTime(0);
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { toast.error('Speech not supported. Use text input.'); setStep('text'); return; }
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
 
-    const rec = new SR();
-    recognitionRef.current = rec;
-    rec.lang = 'en-US';
-    rec.continuous = true;
-    rec.interimResults = true;
-    let final = '';
-    let done = false;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
 
-    rec.onresult = (e: any) => {
-      for (let i = e.resultIndex; i < e.results.length; ++i) {
-        if (e.results[i].isFinal) final += e.results[i][0].transcript + ' ';
-      }
-    };
-    rec.onerror = (e: any) => {
-      debugError('Speech', e.error);
-      if (DEBUG) toast.error(`Speech error: ${e.error}`);
-      if (!done) { done = true; setStep('text'); }
-    };
-    rec.onend = () => {
-      if (done) return;
-      done = true;
-      const t = final.trim();
-      if (t) { debugLog('Speech', t); handleProcess(t); }
-      else { toast.error('No speech detected.'); setStep('text'); }
-    };
-    try { rec.start(); } catch { setStep('text'); }
-    setTimeout(() => { try { rec?.stop(); } catch {} }, 8000);
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        handleUploadVoice(audioBlob);
+      };
+
+      setStep('recording');
+      setRecordTime(0);
+      recorder.start();
+
+      // Auto-stop after 8 seconds
+      setTimeout(() => {
+        if (recorder.state === 'recording') recorder.stop();
+      }, 8000);
+
+    } catch (err) {
+      debugError('Audio', err);
+      toast.error('Microphone access denied. Use text input.');
+      setStep('text');
+    }
   };
 
-  const handleStopRecording = () => { try { recognitionRef.current?.stop(); } catch {} };
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleUploadVoice = async (blob: Blob) => {
+    setStep('processing');
+    setProcessingStep('AI Listening to transcript...');
+    
+    try {
+      incrementAICount();
+      const formData = new FormData();
+      formData.append('audio', blob);
+
+      const res = await fetch('/api/voice-sos', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error('Voice analysis failed');
+      
+      const result = await res.json();
+      setAiResult(result);
+      setStep('confirming');
+    } catch (err) {
+      debugError('Voice-API', err);
+      toast.error('❌ Voice processing failed.');
+      setStep('selecting');
+    }
+  };
 
   // ── Text ──
   const handleTextSubmit = () => {
@@ -228,12 +258,22 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
         {step === 'recording' && (
           <div className="flex flex-col items-center gap-6">
             <div className="relative">
-              <div className="w-32 h-32 bg-primary/20 rounded-full animate-ping absolute inset-0" />
-              <div className="w-32 h-32 bg-gradient-to-br from-primary to-indigo-600 rounded-full flex items-center justify-center relative z-10 shadow-2xl"><Mic size={48} className="text-white" /></div>
+              <div className="w-40 h-40 bg-red-600/20 rounded-full animate-ping absolute inset-0" />
+              <div className="w-40 h-40 bg-red-600/40 rounded-full animate-pulse absolute inset-0" />
+              <div className="w-40 h-40 bg-gradient-to-br from-red-500 to-indigo-600 rounded-full flex items-center justify-center relative z-10 shadow-2xl pulse-red-heavy">
+                <Mic size={56} className="text-white" />
+              </div>
             </div>
-            <h2 className="text-4xl font-bold text-white tabular-nums">{formatTime(recordTime)}</h2>
-            <p className="text-primary font-bold uppercase tracking-widest animate-pulse text-sm flex items-center gap-2"><Radio size={12} /> Recording...</p>
-            <button onClick={handleStopRecording} className="px-6 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white font-semibold text-sm">Stop & Analyze</button>
+            <div className="flex flex-col items-center">
+              <h2 className="text-5xl font-black text-white tabular-nums tracking-tighter">{8 - recordTime}s</h2>
+              <p className="text-red-500 font-extrabold uppercase tracking-[0.3em] animate-pulse text-sm flex items-center gap-2 mt-2">
+                <Radio size={14} /> Listening Live...
+              </p>
+            </div>
+            <p className="text-white/40 text-[11px] max-w-[200px]">Describe the situation briefly. AI is analyzing your tone and urgency.</p>
+            <button onClick={handleStopRecording} className="mt-4 px-8 py-3 bg-red-500 text-white rounded-2xl font-black text-sm shadow-xl shadow-red-900/40 active:scale-95 transition-all">
+              STOP & DISPATCH
+            </button>
           </div>
         )}
 
@@ -274,7 +314,9 @@ const EmergencyTrigger: React.FC<EmergencyTriggerProps> = ({ onClose }) => {
 
       <style jsx>{`
         .pulse-red { animation: pulse-red 2s infinite; }
+        .pulse-red-heavy { animation: pulse-red-heavy 1.5s infinite; }
         @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(37,99,235,0.4); } 70% { box-shadow: 0 0 0 20px rgba(37,99,235,0); } 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); } }
+        @keyframes pulse-red-heavy { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.6); transform: scale(1); } 50% { transform: scale(1.05); } 70% { box-shadow: 0 0 0 30px rgba(239,68,68,0); } 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); transform: scale(1); } }
       `}</style>
     </div>
   );

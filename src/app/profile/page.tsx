@@ -194,7 +194,9 @@ const ProfilePage = () => {
               localStorage.removeItem('crisislink_login_at');
               await signOut(auth); 
             } catch {} 
-            useAppStore.getState().setCurrentUser(null); 
+            const store = useAppStore.getState();
+            store.setCurrentUser(null); 
+            store.setActiveAlert(null);
             router.push('/login'); 
           }}
           className="w-full flex items-center justify-center gap-3 py-4 bg-red-50 text-primary border border-red-100 rounded-2xl font-bold transition-all hover:bg-primary hover:text-white tap-effect"
