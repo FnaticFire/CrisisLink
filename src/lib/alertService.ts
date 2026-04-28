@@ -104,6 +104,29 @@ export async function getResponderActiveAlert(responderId: string): Promise<Aler
   }
 }
 
+// ─── Get active mission for a traffic responder ───
+export async function getTrafficActiveAlert(trafficResponderId: string): Promise<AlertDoc | null> {
+  try {
+    const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const q = query(
+      collection(db, ALERTS_COL),
+      where('trafficResponderId', '==', trafficResponderId),
+      where('status', 'in', ['accepted', 'en_route']),
+      where('createdAt', '>', twentyFourHoursAgo)
+    );
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const alerts = snap.docs.map(d => d.data() as AlertDoc);
+      alerts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      return alerts[0];
+    }
+    return null;
+  } catch (err) {
+    debugError('Firestore', 'getTrafficActiveAlert failed:', err);
+    return null;
+  }
+}
+
 // ─── Real-time listener for ALL non-resolved alerts ───
 // NO orderBy — avoids composite index requirement. Sort client-side.
 export function listenToPendingAlerts(callback: (alerts: AlertDoc[]) => void): Unsubscribe {
@@ -205,6 +228,20 @@ export async function joinAsTrafficSupport(alertId: string, responder: UserDoc):
     });
   } catch (err) {
     debugError('Firestore', 'joinAsTrafficSupport failed:', err);
+  }
+}
+
+export async function leaveTrafficSupport(alertId: string): Promise<void> {
+  try {
+    const ref = doc(db, ALERTS_COL, alertId);
+    await updateDoc(ref, {
+      trafficSupport: false,
+      trafficResponderId: null,
+      trafficResponderName: null,
+      greenCorridorLevel: null
+    });
+  } catch (err) {
+    debugError('Firestore', 'leaveTrafficSupport failed:', err);
   }
 }
 

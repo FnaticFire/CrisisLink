@@ -9,7 +9,7 @@ import { Role, UserDoc } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { getMyActiveAlert, getResponderActiveAlert } from '@/lib/alertService';
+import { getMyActiveAlert, getResponderActiveAlert, getTrafficActiveAlert } from '@/lib/alertService';
 import { Sun, Moon } from 'lucide-react';
 
 export default function LoginPage() {
@@ -39,13 +39,14 @@ export default function LoginPage() {
           setCurrentUser(userData);
           localStorage.setItem('crisislink_login_at', Date.now().toString());
           
-          // Restore any active alert / mission (Survivor OR Responder role)
-          const [asSurvivor, asResponder] = await Promise.all([
+          // Restore any active alert / mission (Survivor, Responder, or Traffic role)
+          const [asSurvivor, asResponder, asTraffic] = await Promise.all([
             getMyActiveAlert(userData.id),
-            getResponderActiveAlert(userData.id)
+            getResponderActiveAlert(userData.id),
+            getTrafficActiveAlert(userData.id)
           ]);
 
-          const activeAlert = asSurvivor || asResponder;
+          const activeAlert = asSurvivor || asResponder || asTraffic;
 
           if (activeAlert) {
             setActiveAlert(activeAlert);

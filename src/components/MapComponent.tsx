@@ -38,6 +38,12 @@ const getEmergencyIcon = (severity: string, type: string) => {
   });
 };
 
+const hospitalIcon = typeof window !== 'undefined' ? L.divIcon({
+  className: 'hospital-marker',
+  html: '<div class="w-8 h-8 bg-blue-600 border-4 border-white rounded-full shadow-xl flex items-center justify-center text-white text-sm animate-bounce">🏥</div>',
+  iconSize: [32, 32],
+}) : undefined;
+
 const recommendationIcon = (type: string) => {
   if (typeof window === 'undefined') return undefined;
   const emoji = type === 'hospital' ? '🏥' : type === 'police' ? '👮' : '🚒';
@@ -151,6 +157,23 @@ const MapComponent: React.FC<MapComponentProps> = ({ nearbyPlaces = [], alerts =
           <MapBoundsHandler 
              pos1={[alerts[0].userLocation.lat, alerts[0].userLocation.lng]} 
              pos2={trackingPos} 
+          />
+        </>
+      )}
+
+      {/* Hospital Destination Map Elements */}
+      {alerts[0]?.hospitalLocation && (
+        <>
+          <Marker position={[alerts[0].hospitalLocation.lat, alerts[0].hospitalLocation.lng]} icon={hospitalIcon}>
+            <Popup><div className="font-bold text-xs">{alerts[0].hospitalName || 'Destination Hospital'}</div></Popup>
+          </Marker>
+          {/* Mission Route from Scene to Hospital */}
+          <Polyline 
+            positions={[
+              [alerts[0].userLocation.lat, alerts[0].userLocation.lng], 
+              [alerts[0].hospitalLocation.lat, alerts[0].hospitalLocation.lng]
+            ]} 
+            pathOptions={{ color: '#3B82F6', weight: 5, dashArray: '10, 10', opacity: 0.8 }} 
           />
         </>
       )}

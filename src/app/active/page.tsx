@@ -23,6 +23,7 @@ export default function ActiveEmergencyPage() {
   const [humanMessages, setHumanMessages] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [humanChatInput, setHumanChatInput] = useState('');
+  const [hospitalQuery, setHospitalQuery] = useState('');
   const [responderAccepted, setResponderAccepted] = useState(false);
   const [newMsgCount, setNewMsgCount] = useState(0);
   const [lastHumanMsg, setLastHumanMsg] = useState<string | null>(null);
@@ -156,11 +157,59 @@ export default function ActiveEmergencyPage() {
 
   const handleResolve = async () => {
     try {
-      await resolveAlertInDB(alert.id);
-      resolveAlert();
-      router.push('/');
-      toast.success('Emergency resolved.');
+      if (currentUser?.role === 'traffic') {
+        const { leaveTrafficSupport } = await import('@/lib/alertService');
+        await leaveTrafficSupport(alert.id);
+        resolveAlert();
+        router.push('/');
+        toast.success('Left Green Corridor Mission.');
+      } else {
+        await resolveAlertInDB(alert.id);
+        resolveAlert();
+        router.push('/');
+        toast.success('Emergency resolved.');
+      }
     } catch { toast.error('Failed to resolve.'); }
+  };
+
+  const handleSearchHospital = async () => {
+    if (!hospitalQuery.trim()) return;
+    toast.loading('Searching Map...', { id: 'h-search' });
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(hospitalQuery + ' hospital')}&format=json&limit=1`);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lon = parseFloat(data[0].lon);
+        const name = data[0].display_name.split(',')[0];
+        const { setHospitalDestination } = await import('@/lib/alertService');
+        await setHospitalDestination(alert.id, name, lat, lon);
+        toast.success('Hospital route set.', { id: 'h-search' });
+        setHospitalQuery('');
+      } else {
+        toast.error('Location not found.', { id: 'h-search' });
+      }
+    } catch {
+      toast.error('Search failed', { id: 'h-search' });
+    }
+  };
+
+  const handleTrafficLevel = async (lvl: string) => {
+    try {
+      const { updateGreenCorridor } = await import('@/lib/alertService');
+      await updateGreenCorridor(alert.id, lvl as any);
+      if (currentUser) {
+        await sendChatMessage(alert.id, {
+          senderId: currentUser.id,
+          senderName: currentUser.username,
+          senderRole: currentUser.role,
+          text: `🟢 Traffic Control: Green Corridor set to ${lvl} level.`,
+          timestamp: Date.now(),
+        });
+      }
+    } catch {
+      toast.error('Failed to update corridor.');
+    }
   };
 
   const handleSendAI = async (e: React.FormEvent) => {
@@ -259,7 +308,7 @@ export default function ActiveEmergencyPage() {
               <span className="text-white font-semibold text-[11px]">ETA: {formatETA(etaSec)} • {distKm.toFixed(1)} km</span>
             </div>
           )}
-          {alert.trafficSupport && (
+          {alert.trafficSupport && !isCivilian && (
             <div className={`bg-emerald-600/90 backdrop-blur px-3 py-1.5 rounded-xl border border-emerald-400/30 flex items-center gap-1.5 ${alert.greenCorridorLevel ? 'animate-pulse' : 'opacity-80'}`}>
               <Shield size={10} className="text-white" />
               <span className="text-white font-bold text-[10px] tracking-wide">
@@ -321,11 +370,11 @@ export default function ActiveEmergencyPage() {
                Call: {alert.userPhone || 'Survivor'}
              </a>
           )}
-          {canResolve && (
-            <button onClick={handleResolve} className="bg-green-600 text-white font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 active:scale-95 shadow-lg shadow-green-900/20">
-              <CheckCircle2 size={13} /> Resolve
-            </button>
-          )}
+            {canResolve && (
+              <button onClick={handleResolve} className="bg-green-600 text-white font-bold text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 active:scale-95 shadow-lg shadow-green-900/20">
+                <CheckCircle2 size={13} /> {currentUser?.role === 'traffic' ? 'Leave Route' : 'Resolve'}
+              </button>
+            )}
         </div>
 
         {/* Traffic Police Control Panel */}
@@ -341,7 +390,7 @@ export default function ActiveEmergencyPage() {
               {(['LOW', 'MEDIUM', 'HIGH', 'MAX'] as const).map(lvl => (
                 <button
                   key={lvl}
-                  onClick={() => import('@/lib/alertService').then(m => m.updateGreenCorridor(alert.id, lvl))}
+                  onClick={() => handleTrafficLevel(lvl)}
                   className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${alert.greenCorridorLevel === lvl ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}
                 >
                   {lvl}
@@ -358,21 +407,23 @@ export default function ActiveEmergencyPage() {
               <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
                 <Hospital size={10} className="animate-pulse" /> Hospital Route Management
               </span>
-              <span className="text-[10px] text-blue-300/60 font-bold">{alert.hospitalName || 'SELECT DESTINATION'}</span>
+              <span className="text-[10px] text-blue-300/60 font-bold truncate max-w-[120px] text-right">{alert.hospitalName || 'NO DESTINATION'}</span>
             </div>
             <div className="flex gap-2">
-              {[
-                { name: 'City Central Hospital', lat: 28.625, lng: 77.215 },
-                { name: 'Red Cross Medical Center', lat: 28.618, lng: 77.230 },
-              ].map(h => (
-                <button
-                  key={h.name}
-                  onClick={() => import('@/lib/alertService').then(m => m.setHospitalDestination(alert.id, h.name, h.lat, h.lng))}
-                  className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${alert.hospitalName === h.name ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}
-                >
-                  <MapPin size={10} className="inline mr-1" /> {h.name.split(' ')[0]}
-                </button>
-              ))}
+              <input 
+                type="text" 
+                value={hospitalQuery} 
+                onChange={(e) => setHospitalQuery(e.target.value)} 
+                placeholder="Hospital name or area..." 
+                className="flex-1 bg-white/5 border border-blue-500/20 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-blue-500/50"
+              />
+              <button 
+                onClick={handleSearchHospital}
+                disabled={!hospitalQuery.trim()}
+                className="bg-blue-600 text-white px-3 py-2 rounded-xl text-xs font-bold active:scale-95 disabled:opacity-50"
+              >
+                Set Route
+              </button>
             </div>
           </div>
         )}
