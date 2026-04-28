@@ -27,22 +27,25 @@ export async function createAlert(alert: AlertDoc): Promise<string> {
 }
 
 // ─── Get active alert for a user (civilian) ───
-// Uses simple query without orderBy to avoid needing composite index
 export async function getMyActiveAlert(userId: string): Promise<AlertDoc | null> {
   try {
     const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
     const q = query(
       collection(db, ALERTS_COL),
-      where('userId', '==', userId),
-      where('status', 'in', ['pending', 'accepted', 'en_route']),
-      where('createdAt', '>', twentyFourHoursAgo)
+      where('userId', '==', userId)
     );
     const snap = await getDocs(q);
     if (!snap.empty) {
-      // Sort client-side to get the most recent
       const alerts = snap.docs.map(d => d.data() as AlertDoc);
-      alerts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      return alerts[0];
+      // Filter client-side
+      const active = alerts.filter(a => 
+        ['pending', 'accepted', 'en_route'].includes(a.status) &&
+        (a.createdAt || 0) > twentyFourHoursAgo
+      );
+      if (active.length > 0) {
+        active.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        return active[0];
+      }
     }
     return null;
   } catch (err) {
@@ -87,15 +90,19 @@ export async function getResponderActiveAlert(responderId: string): Promise<Aler
     const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
     const q = query(
       collection(db, ALERTS_COL),
-      where('responderId', '==', responderId),
-      where('status', 'in', ['accepted', 'en_route']),
-      where('createdAt', '>', twentyFourHoursAgo)
+      where('responderId', '==', responderId)
     );
     const snap = await getDocs(q);
     if (!snap.empty) {
       const alerts = snap.docs.map(d => d.data() as AlertDoc);
-      alerts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      return alerts[0];
+      const active = alerts.filter(a => 
+        ['accepted', 'en_route'].includes(a.status) &&
+        (a.createdAt || 0) > twentyFourHoursAgo
+      );
+      if (active.length > 0) {
+        active.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        return active[0];
+      }
     }
     return null;
   } catch (err) {
@@ -110,15 +117,19 @@ export async function getTrafficActiveAlert(trafficResponderId: string): Promise
     const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
     const q = query(
       collection(db, ALERTS_COL),
-      where('trafficResponderId', '==', trafficResponderId),
-      where('status', 'in', ['accepted', 'en_route']),
-      where('createdAt', '>', twentyFourHoursAgo)
+      where('trafficResponderId', '==', trafficResponderId)
     );
     const snap = await getDocs(q);
     if (!snap.empty) {
       const alerts = snap.docs.map(d => d.data() as AlertDoc);
-      alerts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      return alerts[0];
+      const active = alerts.filter(a => 
+        ['accepted', 'en_route'].includes(a.status) &&
+        (a.createdAt || 0) > twentyFourHoursAgo
+      );
+      if (active.length > 0) {
+        active.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        return active[0];
+      }
     }
     return null;
   } catch (err) {

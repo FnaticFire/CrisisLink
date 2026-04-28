@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Globally accessible function to check if logged in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // ─── Users Collection ───
+    match /users/{userId} {
+      // Users can only read other users' basic profiles or everyone can read to match responders
+      allow read: if isAuthenticated();
+      // Users can only create/update their own profile
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ─── Alerts Collection ───
+    match /alerts/{alertId} {
+      // Any authenticated user can read alerts (civilians reading nearby, responders reading active)
+      allow read: if isAuthenticated();
+      
+      // Creating an alert: Must be authenticated and assigning themselves as userId
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Updating an alert (Responder accepting, User updating location, System resolving)
+      allow update: if isAuthenticated();
+      
+      // No deleting alerts allowed for audit purposes (resolve instead)
+      allow delete: if false;
+
+      // ─── Alert Subcollection: Chat ───
+      match /chat/{chatId} {
+        // Anyone involved or authenticated can read chat (limited to active responders / civilians in MVP)
+        allow read: if isAuthenticated();
+        // Allowed to send message if authenticated and they set themselves as sender
+        allow create: if isAuthenticated() && request.resource.data.senderId == request.auth.uid;
+        // No editing or deleting messages
+        allow update, delete: if false;
+      }
+    }
+  }
+}

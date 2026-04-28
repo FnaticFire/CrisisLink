@@ -7,7 +7,7 @@ import { useAppStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/TopBar';
 import EmergencyTrigger from '@/components/EmergencyTrigger';
-import { listenToAlert, listenToPendingAlerts, acceptAlert, haversineKm, getEmergencyNumber, createAlert, getMyActiveAlert, getResponderActiveAlert } from '@/lib/alertService';
+import { listenToAlert, listenToPendingAlerts, acceptAlert, haversineKm, getEmergencyNumber, createAlert, getMyActiveAlert, getResponderActiveAlert, getTrafficActiveAlert } from '@/lib/alertService';
 import { db, auth } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
@@ -72,18 +72,25 @@ export default function Home() {
     const restoreSession = async () => {
       let foundAlert = activeAlert;
       // If store is empty, check Firestore
-      if (!foundAlert) {
-        foundAlert = isCivilian 
-          ? await getMyActiveAlert(currentUser.id)
-          : await getResponderActiveAlert(currentUser.id);
+      if (!foundAlert && currentUser) {
+        // A user could be a victim, a primary responder, or a traffic responder
+        // Check all three and pick the most recent one
+        const [asVictim, asResponder, asTraffic] = await Promise.all([
+          getMyActiveAlert(currentUser.id),
+          getResponderActiveAlert(currentUser.id),
+          getTrafficActiveAlert(currentUser.id)
+        ]);
+
+        const allActive = [asVictim, asResponder, asTraffic].filter(Boolean) as AlertDoc[];
+        if (allActive.length > 0) {
+          allActive.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          foundAlert = allActive[0];
+        }
       }
       
       if (foundAlert) {
         setActiveAlert(foundAlert);
-        // Only redirect of NOT pending
-        if (foundAlert.status !== 'pending') {
-          router.push('/active');
-        }
+        router.push('/active');
       }
     };
     restoreSession();
@@ -243,7 +250,7 @@ export default function Home() {
         {activeAlert && (
           <div className="mb-5">
             <PendingAlertListener />
-            <Link href={activeAlert.status === 'pending' ? '#' : '/active'}>
+            <Link href="/active">
               <div className={`relative overflow-hidden rounded-2xl p-4 card-shadow ${activeAlert.status === 'pending' ? 'bg-slate-100 border border-slate-200' : 'bg-gradient-to-r from-red-500 via-rose-500 to-orange-500'}`}>
                 {activeAlert.status !== 'pending' && <div className="absolute inset-0 shimmer" />}
                 <div className="relative flex items-center gap-3">

@@ -5,7 +5,7 @@ import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useAppStore } from '@/lib/store';
-import { Role, UserDoc } from '@/lib/types';
+import { Role, UserDoc, AlertDoc } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -46,10 +46,12 @@ export default function LoginPage() {
             getTrafficActiveAlert(userData.id)
           ]);
 
-          const activeAlert = asSurvivor || asResponder || asTraffic;
-
-          if (activeAlert) {
-            setActiveAlert(activeAlert);
+          const allActive = [asSurvivor, asResponder, asTraffic].filter(Boolean) as AlertDoc[];
+          
+          if (allActive.length > 0) {
+            allActive.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            const mostRecent = allActive[0];
+            setActiveAlert(mostRecent);
             router.push('/active');
           } else {
             setActiveAlert(null); // CRITICAL: Clear any stale persisted alert from previous logins
