@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ShieldAlert, Users, MapPin, BookOpen, ChevronRight, X, Phone, Zap, Heart, Flame, Droplets, Shield, CheckCircle2, Navigation, Loader2, HandHelping, Send } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
@@ -47,6 +47,12 @@ export default function Home() {
   const [showPhoneUpdate, setShowPhoneUpdate] = useState(false);
   const [newPhone, setNewPhone] = useState('');
   const [updatingPhone, setUpdatingPhone] = useState(false);
+  const lastFilteredCount = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    audioRef.current = new Audio('/alert.wav');
+  }, []);
 
   const isCivilian = currentUser?.role === 'civilian';
   const isResponder = !isCivilian;
@@ -129,6 +135,11 @@ export default function Home() {
       
       return false;
     });
+    if (filtered.length > lastFilteredCount.current) {
+      audioRef.current?.play().catch(e => debugLog('Audio', 'Play failed - requires interaction'));
+    }
+    lastFilteredCount.current = filtered.length;
+
     setFilteredAlerts(filtered);
   }, [pendingAlerts, currentUser]);
 
