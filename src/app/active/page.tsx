@@ -173,24 +173,41 @@ export default function ActiveEmergencyPage() {
   };
 
   const handleSearchHospital = async () => {
-    if (!hospitalQuery.trim()) return;
+    if (!hospitalQuery.trim() || !alert) return;
     toast.loading('Searching Map...', { id: 'h-search' });
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(hospitalQuery + ' hospital')}&format=json&limit=1`);
+      const { lat, lng } = alert.userLocation;
+      // 50km radius is approx 0.45 degrees
+      const d = 0.45;
+      const viewbox = `${lng - d},${lat + d},${lng + d},${lat - d}`;
+      
+      const q = hospitalQuery.toLowerCase().includes('hospital') 
+        ? hospitalQuery 
+        : `${hospitalQuery} hospital`;
+
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&viewbox=${viewbox}&bounded=1`;
+      
+      const res = await fetch(url, {
+        headers: {
+          'Accept-Language': 'en'
+        }
+      });
       const data = await res.json();
+      
       if (data && data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lon = parseFloat(data[0].lon);
+        const hLat = parseFloat(data[0].lat);
+        const hLon = parseFloat(data[0].lon);
         const name = data[0].display_name.split(',')[0];
         const { setHospitalDestination } = await import('@/lib/alertService');
-        await setHospitalDestination(alert.id, name, lat, lon);
-        toast.success('Hospital route set.', { id: 'h-search' });
+        await setHospitalDestination(alert.id, name, hLat, hLon);
+        toast.success(`Route set to ${name}`, { id: 'h-search' });
         setHospitalQuery('');
       } else {
-        toast.error('Location not found.', { id: 'h-search' });
+        toast.error('Hospital not found within 50km. Try a broader name.', { id: 'h-search' });
       }
-    } catch {
-      toast.error('Search failed', { id: 'h-search' });
+    } catch (err) {
+      debugError('HospitalSearch', err);
+      toast.error('Search failed. Check connection.', { id: 'h-search' });
     }
   };
 
